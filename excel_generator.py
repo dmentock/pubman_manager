@@ -15,6 +15,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
 
     for i in range(n_authors):
         column_details[f'Name {i + 1}'] = 20
+        column_details[f'Helper {i + 1}'] = 10  # Add helper columns
         column_details[f'Affiliation {i + 1}'] = 30
 
     # Create a workbook and add worksheets
@@ -57,16 +58,13 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
         for col_index, affiliation in enumerate(affiliations[name], start=1):
             names_sheet.write(row_index, col_index, affiliation)
 
-    # Create named ranges for each row of affiliations
-    for row_index, name in enumerate(names, start=1):
-        start_col = 2
-        end_col = start_col + len(affiliations[name]) - 1
-        workbook.define_name(f"row_{row_index}", f"Names!${chr(64 + start_col)}${row_index + 1}:${chr(64 + end_col)}${row_index + 1}")
-    # Create dropdown lists in the main sheet for each author's name and affiliation
+    # Create helper columns for row indices and affiliations
     for entry_row in range(n_entries):
         for i in range(n_authors):
             name_col = list(column_details.keys()).index(f'Name {i + 1}')
+            helper_col = list(column_details.keys()).index(f'Helper {i + 1}')
             affiliation_col = list(column_details.keys()).index(f'Affiliation {i + 1}')
+            row_index_cell = col_num_to_col_letter(helper_col + 1) + str(start_row + 2 + entry_row)
 
             # Set data validation for names
             main_sheet.data_validation(start_row + 1 + entry_row, name_col, start_row + 1 + entry_row, name_col, {
@@ -76,12 +74,21 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
                 'error_type': 'warning'
             })
 
+            # Populate helper column with row index
+            main_sheet.write_formula(start_row + 1 + entry_row, helper_col,
+                                     f'MATCH({col_num_to_col_letter(name_col + 1)}{start_row + 2 + entry_row}, Names!$A$2:$A${len(names) + 1}, 0) + 1')
+
             # Set data validation for affiliations
             main_sheet.data_validation(start_row + 1 + entry_row, affiliation_col, start_row + 1 + entry_row, affiliation_col, {
                 'validate': 'list',
-                'source': f'=INDIRECT("row_" & MATCH({col_num_to_col_letter(name_col + 1)}{start_row + 2 + entry_row}, Names!$A$2:$A${len(names) + 1}, 0) + 1)',
+                'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":Z" & {row_index_cell})',
                 'input_message': f'Select Affiliation {i + 1} from the list or enter your own',
                 'error_type': 'warning'
             })
+
+    # Hide the helper columns
+    for i in range(n_authors):
+        helper_col = list(column_details.keys()).index(f'Helper {i + 1}')
+        main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})
 
     workbook.close()
