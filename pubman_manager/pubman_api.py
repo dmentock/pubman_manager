@@ -5,6 +5,7 @@ import pandas as pd
 import dateutil
 from collections import OrderedDict
 from pathlib import Path
+from dateutil.parser import ParserError
 
 class PubManAPI:
     def __init__(self, username, password, base_url = "https://pure.mpg.de/rest"):
@@ -301,7 +302,7 @@ class PubManAPI:
 
         return author_affiliations
 
-    def create_event_publication(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_affiliations):
+    def create_event_publication_request(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_affiliations):
         metadata_creators = []
         for author, affiliations in authors_affiliations.items():
             given_name, family_name = author.split(' ', 1)
@@ -321,7 +322,7 @@ class PubManAPI:
                 "type": "PERSON"
             })
 
-        item_data = {
+        return {
             "context": {
                 "objectId": self.ctx_id,
                 "name" : "",
@@ -341,7 +342,7 @@ class PubManAPI:
             "metadata": {
                 "title": title,
                 "creators": metadata_creators,
-                "dateCreated": talk_date.strftime("%Y-%m-%d"),
+                "dateCreated": talk_date.strftime("%Y-%m-%d") if talk_date else None,
                 "datePublishedInPrint": "",
                 "datePublishedOnline": "",
                 "genre": "TALK_AT_EVENT",
@@ -356,23 +357,6 @@ class PubManAPI:
             },
             "files": []
         }
-
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
-
-        response = requests.post(
-            f"{self.base_url}/items",
-            headers=headers,
-            data=json.dumps(item_data)
-        )
-
-        if response.status_code in [200, 201]:
-            return response.json()
-        else:
-            raise Exception("Failed to create item", response.status_code, response.text)
-
 
     def process_excel_and_create_publications(self, file_path):
         def find_header_row(df):
@@ -392,30 +376,52 @@ class PubManAPI:
                 affiliation_key = f'Affiliation {i}'
                 if author_name_key in row and affiliation_key in row:
                     if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                        print("aha",row[affiliation_key])
                         if row[author_name_key] not in authors_affiliations:
                             authors_affiliations[row[author_name_key]] = [row[affiliation_key]]
                         else:
                             authors_affiliations[row[author_name_key]].append(row[affiliation_key])
             return authors_affiliations
 
-        def process_dataframe(df):
-            for index, row in df.iterrows():
-                authors_affiliations = extract_authors_affiliations(row)
-                self.create_event_publication(
-                    event_name=row.get('Event Name'),
-                    start_date=dateutil.parser.parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))),
-                    end_date=dateutil.parser.parse(str(row.get('Conference end date\n(dd.mm.YYYY)'))),
-                    talk_date=dateutil.parser.parse(str(row.get('Talk date\n(dd.mm.YYYY)'))),
-                    location=row.get('Conference Location'),
-                    invited=row.get('Invited (y/n)'),
-                    title=row.get('Talk Title'),
-                    authors_affiliations=authors_affiliations
-                )
+        def safe_date_parse(date_str):
+            try:
+                return dateutil.parser.parse(date_str)
+            except (ParserError, ValueError):
+                return None
+
         df_full = pd.read_excel(file_path, engine='openpyxl', header=None)
         header_row = find_header_row(df_full)
         start_row = header_row + 2
         end_row = find_end_row(df_full, start_row)
         df_data = pd.read_excel(file_path, engine='openpyxl', header=header_row)
-        df_cleaned = df_data.iloc[start_row - header_row - 1:end_row - header_row]
-        process_dataframe(df_cleaned)
+        df = df_data.iloc[start_row - header_row - 1:end_row - header_row]
+
+        request_list = []
+        for index, row in df.iterrows():
+            print(f"generating requests for \"{row.get('Talk Title')}\"")
+            authors_affiliations = extract_authors_affiliations(row)
+            request_list.append(self.create_event_publication_request(
+                event_name=row.get('Event Name'),
+                start_date=safe_date_parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))),
+                end_date=safe_date_parse(str(row.get('Conference end date\n(dd.mm.YYYY)'))),
+                talk_date=safe_date_parse(str(row.get('Talk date\n(dd.mm.YYYY)'))),
+                location=row.get('Conference Location'),
+                invited=row.get('Invited (y/n)'),
+                title=row.get('Talk Title'),
+                authors_affiliations=authors_affiliations
+            ))
+
+        for request_json in request_list:
+            print(f"executing request: {request_json}")
+            headers = {
+                "Authorization": self.auth_token,
+                "Content-Type": "application/json"
+            }
+            response = requests.post(
+                f"{self.base_url}/items",
+                headers=headers,
+                data=json.dumps(request_json)
+            )
+        if response.status_code in [200, 201]:
+            return response.json()
+        else:
+            raise Exception("Failed to create item", response.status_code, response.text)
