@@ -119,18 +119,6 @@ class PubManAPI:
         )
         return response.json()
 
-    def create_item(self, item_data):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
-        response = requests.post(
-            f"{self.base_url}/items",
-            headers=headers,
-            data=json.dumps(item_data)
-        )
-        return response.json()
-
     def update_item(self, item_id, item_data):
         headers = {
             "Authorization": self.auth_token,
@@ -280,8 +268,8 @@ class PubManAPI:
                         organizations[org_name] = org.get('identifierPath')
         return organizations
 
-    def extract_author_affiliations(self, publications):
-        author_affiliations = {}
+    def extract_author_info(self, publications):
+        author_info = {}
         for record in publications:
             metadata = record.get('data', {}).get('metadata', {})
             creators = metadata.get('creators', [])
@@ -293,14 +281,18 @@ class PubManAPI:
                 organizations = person.get('organizations', [])
                 affiliation_list = [org['name'] for org in organizations]
 
-                if full_name in author_affiliations:
-                    author_affiliations[full_name].update(affiliation_list)
+                if full_name not in author_info:
+                    author_info[full_name] = {}
+                if 'affiliations' in author_info[full_name]:
+                    author_info[full_name]['affiliations'].update(affiliation_list)
                 else:
-                    author_affiliations[full_name] = set(affiliation_list)
-        for author in author_affiliations:
-            author_affiliations[author] = list(author_affiliations[author])
-
-        return author_affiliations
+                    author_info[full_name]['affiliations'] = set(affiliation_list)
+                if (identifier := person.get('identifier')) and 'identifier' not in author_info[full_name]:
+                    author_info[full_name]['identifier'] = identifier
+        for author in author_info:
+            if 'affiliations' in author_info[author]:
+                author_info[author]['affiliations'] = list(author_info[author]['affiliations'])
+        return author_info
 
     def create_event_publication_request(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_affiliations):
         metadata_creators = []
@@ -347,7 +339,7 @@ class PubManAPI:
                 "datePublishedOnline": "",
                 "genre": "TALK_AT_EVENT",
                 "event": {
-                    "endDate": end_date.strftime("%Y-%m-%d"),
+                    "endDate": end_date.strftime("%Y-%m-%d") if end_date != start_date else None,
                     "place": location,
                     "startDate": start_date.strftime("%Y-%m-%d"),
                     "title": event_name,
@@ -358,7 +350,75 @@ class PubManAPI:
             "files": []
         }
 
-    def process_excel_and_create_publications(self, file_path):
+    def search_publication_by_criteria(self, match_criteria, size=100000):
+        must_clauses = []
+        for key, value in match_criteria.items():
+            must_clauses.append({
+                "match_phrase": {
+                    key: value
+                }
+            })
+
+        query = {
+            "query": {
+                "bool": {
+                    "must": must_clauses
+                }
+            },
+            "size": size  # Adjust the size as needed
+        }
+
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            f"{self.base_url}/items/search",
+            headers=headers,
+            data=json.dumps(query)
+        )
+        if response.status_code in [200, 201]:
+            results = response.json()
+            return results.get('records')
+        else:
+            raise Exception("Failed to search for item", response.status_code, response.text)
+
+
+    def create_item(self, request_json):
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+        response = requests.post(
+            f"{self.base_url}/items",
+            headers=headers,
+            data=json.dumps(request_json)
+        )
+        if response.status_code in [200, 201]:
+            return response.json()
+        else:
+            raise Exception("Failed to create item", response.status_code, response.text)
+
+    def submit_item(self, item_id, last_modification_date):
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+        submit_data = {
+            "comment": "Item Submitted via API",
+            "lastModificationDate": last_modification_date
+        }
+        response = requests.put(
+            f"{self.base_url}/items/{item_id}/submit",
+            headers=headers,
+            data=json.dumps(submit_data)
+        )
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception("Failed to submit item", response.status_code, response.text)
+
+    def process_excel_and_create_publications(self, file_path, create_items = True, submit_items = True):
         def find_header_row(df):
             for i, row in df.iterrows():
                 if row[0] == 1:
@@ -399,7 +459,7 @@ class PubManAPI:
         for index, row in df.iterrows():
             print(f"generating requests for \"{row.get('Talk Title')}\"")
             authors_affiliations = extract_authors_affiliations(row)
-            request_list.append(self.create_event_publication_request(
+            request_list.append((row.get('Talk Title'), row.get('Event Name'), self.create_event_publication_request(
                 event_name=row.get('Event Name'),
                 start_date=safe_date_parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))),
                 end_date=safe_date_parse(str(row.get('Conference end date\n(dd.mm.YYYY)'))),
@@ -408,20 +468,27 @@ class PubManAPI:
                 invited=row.get('Invited (y/n)'),
                 title=row.get('Talk Title'),
                 authors_affiliations=authors_affiliations
-            ))
+            )))
 
-        for request_json in request_list:
-            print(f"executing request: {request_json}")
-            headers = {
-                "Authorization": self.auth_token,
-                "Content-Type": "application/json"
-            }
-            response = requests.post(
-                f"{self.base_url}/items",
-                headers=headers,
-                data=json.dumps(request_json)
-            )
-        if response.status_code in [200, 201]:
-            return response.json()
-        else:
-            raise Exception("Failed to create item", response.status_code, response.text)
+        if create_items:
+            item_ids = []
+            for talk_title, event_title, request_json in request_list:
+                print(f"Creating entry for title: {talk_title}")
+                existing_publication = self.search_publication_by_criteria({
+                    "metadata.title": talk_title,
+                    "metadata.event.title": event_title
+                })
+                if existing_publication:
+                    print(f"Publication already exists, skipping creation: '{talk_title}'; 'event_title'")
+                    created_item = existing_publication[0]['data']
+                else:
+                    print(f"Creating new publication with title '{talk_title}'")
+                    created_item = self.create_item(request_json)
+                item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState'] ))
+            if submit_items:
+                for item_id, modification_date, version_state in item_ids:
+                    if version_state not in ['PENDING', 'IN_REVISION']:
+                        print(f"Entry already has the state '{version_state}', skipping...")
+                    else:
+                        submitted_item = self.submit_item(item_id, modification_date)
+                        print(f"Submitted item: {submitted_item}")
