@@ -11,15 +11,15 @@ def col_num_to_col_letter(col_num):
     return col_letter
 
 def create_sheet(file_path, names_affiliations, column_details, n_authors, n_entries):
-    col_layout = OrderedDict([('Entry Number', 15)])
+    col_layout = OrderedDict([('Entry Number', (15, ''))])
     col_layout.update(column_details)
 
     for i in range(n_authors):
-        col_layout[f'Name {i + 1}'] = 30
-        col_layout[f'Affiliation {i + 1}'] = 35
+        col_layout[f'Name {i + 1}'] = (30, '')
+        col_layout[f'Affiliation {i + 1}'] = (35, '')
 
     for i in range(n_authors):
-        col_layout[f'Helper {i + 1}'] = 10  # Add helper columns at the end
+        col_layout[f'Helper {i + 1}'] = (10, '')  # Add helper columns at the end
 
     # Create a workbook and add worksheets
     workbook = xlsxwriter.Workbook(file_path)
@@ -49,7 +49,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
 
     start_row = len(names)
 
-    for i, (header, width) in enumerate(col_layout.items()):
+    for i, (header, (width, tooltip)) in enumerate(col_layout.items()):
         main_sheet.write(start_row, col_index, header, header_format)
         main_sheet.write(start_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
         main_sheet.set_column(col_index, col_index, width)
@@ -80,8 +80,8 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
             main_sheet.data_validation(start_row + 1 + entry_idx, name_col, start_row + 1 + entry_idx, name_col, {
                 'validate': 'list',
                 'source': f'Names!$A$2:$A${len(names) + 1}',
-                'input_message': f'Write the name in <first_name> <last_name> format or select from the list\n\n' + \
-                                  'If it is missing and you cannot find it in the "Names" sheet with ctrl+f (check for usage of . or - or middle names/abbreviations), enter it yourself and override data validation.',
+                'input_message': f'Write the name in <first_name> <last_name> format\n\n' + \
+                                  'If it is missing and you cannot find it in the "Names" sheet with ctrl+f (check for usage of . or - or middle names/abbreviations), enter it yourself and select "yes" to override data validation.',
                 'error_type': 'warning'
             })
 
@@ -109,5 +109,12 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, n_ent
     for i in range(n_authors):
         helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
         main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})
+
+    # Add tooltips to each cell in the specified columns
+    for entry_idx in range(n_entries):
+        for i, (header, (width, tooltip)) in enumerate(col_layout.items()):
+            if tooltip:  # Only add tooltip if it exists
+                cell = col_num_to_col_letter(i + 1) + str(start_row + 2 + entry_idx)
+                main_sheet.write_comment(cell, tooltip)
 
     workbook.close()

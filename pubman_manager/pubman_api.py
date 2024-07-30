@@ -17,6 +17,8 @@ class PubManAPI:
         self.ctx_id = "ctx_2019354" # CTX ID for all MPIE publications, TODO: fetch based on org_id
         with open(Path(__file__).parent.parent / 'identifier_paths.yaml', 'r') as f:
             self.identifier_paths = yaml.safe_load(f)
+        with open(Path(__file__).parent.parent / 'authors_info.yaml', 'r') as f:
+            self.authors_info = yaml.safe_load(f)
         try:
             self.auth_token = self.login()
         except:
@@ -268,7 +270,7 @@ class PubManAPI:
                         organizations[org_name] = org.get('identifierPath')
         return organizations
 
-    def extract_author_info(self, publications):
+    def extract_authors_info(self, publications):
         author_info = {}
         for record in publications:
             metadata = record.get('data', {}).get('metadata', {})
@@ -294,21 +296,23 @@ class PubManAPI:
                 author_info[author]['affiliations'] = list(author_info[author]['affiliations'])
         return author_info
 
-    def create_event_publication_request(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_affiliations):
+    def create_event_publication_request(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_info):
         metadata_creators = []
-        for author, affiliations in authors_affiliations.items():
+        for author, info in authors_info.items():
             given_name, family_name = author.split(' ', 1)
             affiliation_list = []
-            for affiliation in affiliations:
+            for affiliation in info['affiliations']:
                 if affiliation in self.identifier_paths.keys():
                     affiliation_list.append({"name": affiliation, "identifier": self.identifier_paths[affiliation][0], "identifierPath" : [ "" ]})
                 else:
                     affiliation_list.append({"name": affiliation, "identifier": 'ou_persistent22', "identifierPath" : [ "" ]})
+            identifier = info.get('identifier')
             metadata_creators.append({
                 "person": {
                     "givenName": given_name,
                     "familyName": family_name,
-                    "organizations": affiliation_list
+                    "organizations": affiliation_list,
+                    "identifier": identifier
                 },
                 "role": "AUTHOR",
                 "type": "PERSON"
@@ -339,7 +343,7 @@ class PubManAPI:
                 "datePublishedOnline": "",
                 "genre": "TALK_AT_EVENT",
                 "event": {
-                    "endDate": end_date.strftime("%Y-%m-%d") if end_date != start_date else None,
+                    "endDate": end_date.strftime("%Y-%m-%d") if end_date and end_date != start_date else None,
                     "place": location,
                     "startDate": start_date.strftime("%Y-%m-%d"),
                     "title": event_name,
@@ -418,7 +422,7 @@ class PubManAPI:
         else:
             raise Exception("Failed to submit item", response.status_code, response.text)
 
-    def process_excel_and_create_publications(self, file_path, create_items = True, submit_items = True):
+    def process_excel_and_create_publications(self, file_path, create_items=True, submit_items=True, overwrite=False):
         def find_header_row(df):
             for i, row in df.iterrows():
                 if row[0] == 1:
@@ -429,18 +433,24 @@ class PubManAPI:
                     return i - 1
             return len(df) - 1
 
-        def extract_authors_affiliations(row):
-            authors_affiliations = OrderedDict()
-            for i in range(1, 50): # TODO: make scalable
+        def get_authors_info(row):
+            authors_info = OrderedDict()
+            for i in range(1, 50):  # TODO: make scalable
                 author_name_key = f'Name {i}'
                 affiliation_key = f'Affiliation {i}'
                 if author_name_key in row and affiliation_key in row:
                     if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                        if row[author_name_key] not in authors_affiliations:
-                            authors_affiliations[row[author_name_key]] = [row[affiliation_key]]
+                        if row[author_name_key] not in authors_info:
+                            if identifier:=self.authors_info.get(row[author_name_key],{}).get('identifier'):
+                                authors_info[row[author_name_key]] = {'identifier': identifier}
+                            else:
+                                authors_info[row[author_name_key]] = {}
+                        if 'affiliations' not in authors_info[row[author_name_key]]:
+                            authors_info[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
                         else:
-                            authors_affiliations[row[author_name_key]].append(row[affiliation_key])
-            return authors_affiliations
+                            authors_info[row[author_name_key]]['affiliations'].append(row[affiliation_key])
+            print("LELauthors_info",authors_info)
+            return authors_info
 
         def safe_date_parse(date_str):
             try:
@@ -458,7 +468,7 @@ class PubManAPI:
         request_list = []
         for index, row in df.iterrows():
             print(f"generating requests for \"{row.get('Talk Title')}\"")
-            authors_affiliations = extract_authors_affiliations(row)
+            authors_info = get_authors_info(row)
             request_list.append((row.get('Talk Title'), row.get('Event Name'), self.create_event_publication_request(
                 event_name=row.get('Event Name'),
                 start_date=safe_date_parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))),
@@ -467,7 +477,7 @@ class PubManAPI:
                 location=row.get('Conference Location'),
                 invited=row.get('Invited (y/n)'),
                 title=row.get('Talk Title'),
-                authors_affiliations=authors_affiliations
+                authors_info=authors_info,
             )))
 
         if create_items:
@@ -479,12 +489,20 @@ class PubManAPI:
                     "metadata.event.title": event_title
                 })
                 if existing_publication:
-                    print(f"Publication already exists, skipping creation: '{talk_title}'; 'event_title'")
-                    created_item = existing_publication[0]['data']
-                else:
-                    print(f"Creating new publication with title '{talk_title}'")
-                    created_item = self.create_item(request_json)
-                item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState'] ))
+                    if overwrite:
+                        print(f"Overwriting existing publication: '{talk_title}'; '{event_title}'")
+                        for pub in existing_publication:
+                            self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
+                    else:
+                        print(f"Publication already exists, skipping creation: '{talk_title}'; '{event_title}'")
+                        created_item = existing_publication[0]['data']
+                        item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
+                        continue
+
+                print(f"Creating new publication with title '{talk_title}'")
+                created_item = self.create_item(request_json)
+                item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
+
             if submit_items:
                 for item_id, modification_date, version_state in item_ids:
                     if version_state not in ['PENDING', 'IN_REVISION']:
