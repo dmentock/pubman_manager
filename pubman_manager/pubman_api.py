@@ -19,6 +19,8 @@ class PubManAPI:
             self.identifier_paths = yaml.safe_load(f)
         with open(Path(__file__).parent.parent / 'authors_info.yaml', 'r') as f:
             self.authors_info = yaml.safe_load(f)
+        with open(Path(__file__).parent.parent / 'journals.yaml', 'r') as f:
+            self.journals = yaml.safe_load(f)
         try:
             self.auth_token = self.login()
         except:
@@ -256,7 +258,7 @@ class PubManAPI:
             return response.json()
         return None
 
-    def get_organization_mapping(self, yaml_file):
+    def extract_organization_mapping(self, yaml_file):
         with open(yaml_file, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
         organizations = {}
@@ -296,72 +298,45 @@ class PubManAPI:
                 author_info[author]['affiliations'] = list(author_info[author]['affiliations'])
         return author_info
 
-    def create_event_publication_request(self, event_name, start_date, end_date, talk_date, location, invited, title, authors_info):
-        metadata_creators = []
-        for author, info in authors_info.items():
-            given_name, family_name = author.split(' ', 1)
-            affiliation_list = []
-            for affiliation in info['affiliations']:
-                if affiliation in self.identifier_paths.keys():
-                    affiliation_list.append({"name": affiliation, "identifier": self.identifier_paths[affiliation][0], "identifierPath" : [ "" ]})
-                else:
-                    affiliation_list.append({"name": affiliation, "identifier": 'ou_persistent22', "identifierPath" : [ "" ]})
-            identifier = info.get('identifier')
-            metadata_creators.append({
-                "person": {
-                    "givenName": given_name,
-                    "familyName": family_name,
-                    "organizations": affiliation_list,
-                    "identifier": identifier
-                },
-                "role": "AUTHOR",
-                "type": "PERSON"
-            })
-
-        return {
-            "context": {
-                "objectId": self.ctx_id,
-                "name" : "",
-                "lastModificationDate" : "",
-                "creationDate" : "",
-                "creator" : {
-                  "objectId" : ""
-                },
-            },
-            "creator": {
-                "objectId": self.user_id
-            },
-            "modifier": {
-                "objectId": self.user_id
-            },
-            "localTags": [],
-            "metadata": {
-                "title": title,
-                "creators": metadata_creators,
-                "dateCreated": talk_date.strftime("%Y-%m-%d") if talk_date else None,
-                "datePublishedInPrint": "",
-                "datePublishedOnline": "",
-                "genre": "TALK_AT_EVENT",
-                "event": {
-                    "endDate": end_date.strftime("%Y-%m-%d") if end_date and end_date != start_date else None,
-                    "place": location,
-                    "startDate": start_date.strftime("%Y-%m-%d"),
-                    "title": event_name,
-                    "invited": invited == 'y'
-                },
-                "languages": ["eng"]
-            },
-            "files": []
-        }
+    def extract_journal_names(self, publications):
+        journals = {}
+        for record in publications:
+            metadata = record.get('data', {}).get('metadata', {})
+            sources = metadata.get('sources', [])
+            for source in sources:
+                if source.get('title') and source['title'] not in journals:
+                    journals[source.get('title')] = {
+                        'alternativeTitles': source.get('alternativeTitles'),
+                        'genre': source.get('genre'),
+                        'publishingInfo': source.get('publishingInfo'),
+                        'identifiers': {identifier['type']: identifier['id'] for identifier in source.get('identifiers', []) if 'type' in identifier}
+                    }
+                break
+        return journals
 
     def search_publication_by_criteria(self, match_criteria, size=100000):
         must_clauses = []
         for key, value in match_criteria.items():
-            must_clauses.append({
-                "match_phrase": {
-                    key: value
-                }
-            })
+            if isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    must_clauses.append({
+                        "nested": {
+                            "path": key,
+                            "query": {
+                                "bool": {
+                                    "must": [
+                                        {"match_phrase": {f"{key}.{sub_key}": sub_value}}
+                                    ]
+                                }
+                            }
+                        }
+                    })
+            else:
+                must_clauses.append({
+                    "match_phrase": {
+                        key: value
+                    }
+                })
 
         query = {
             "query": {
@@ -422,7 +397,7 @@ class PubManAPI:
         else:
             raise Exception("Failed to submit item", response.status_code, response.text)
 
-    def process_excel_and_create_publications(self, file_path, create_items=True, submit_items=True, overwrite=False):
+    def parse_excel_table(self, file_path):
         def find_header_row(df):
             for i, row in df.iterrows():
                 if row[0] == 1:
@@ -432,81 +407,241 @@ class PubManAPI:
                 if pd.isna(df.iloc[i, 1]) or df.iloc[i, 1].strip() == '':
                     return i - 1
             return len(df) - 1
-
-        def get_authors_info(row):
-            authors_info = OrderedDict()
-            for i in range(1, 50):  # TODO: make scalable
-                author_name_key = f'Name {i}'
-                affiliation_key = f'Affiliation {i}'
-                if author_name_key in row and affiliation_key in row:
-                    if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                        if row[author_name_key] not in authors_info:
-                            if identifier:=self.authors_info.get(row[author_name_key],{}).get('identifier'):
-                                authors_info[row[author_name_key]] = {'identifier': identifier}
-                            else:
-                                authors_info[row[author_name_key]] = {}
-                        if 'affiliations' not in authors_info[row[author_name_key]]:
-                            authors_info[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
-                        else:
-                            authors_info[row[author_name_key]]['affiliations'].append(row[affiliation_key])
-            print("LELauthors_info",authors_info)
-            return authors_info
-
-        def safe_date_parse(date_str):
-            try:
-                return dateutil.parser.parse(date_str)
-            except (ParserError, ValueError):
-                return None
-
         df_full = pd.read_excel(file_path, engine='openpyxl', header=None)
         header_row = find_header_row(df_full)
         start_row = header_row + 2
         end_row = find_end_row(df_full, start_row)
         df_data = pd.read_excel(file_path, engine='openpyxl', header=header_row)
         df = df_data.iloc[start_row - header_row - 1:end_row - header_row]
+        return df
 
+    def get_authors_info(self, row):
+        authors_info = OrderedDict()
+        for i in range(1, 50):  # TODO: make scalable
+            author_name_key = f'Author {i}'
+            affiliation_key = f'Affiliation {i}'
+            if author_name_key in row and affiliation_key in row:
+                if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
+                    if row[author_name_key] not in authors_info:
+                        if identifier:=self.authors_info.get(row[author_name_key],{}).get('identifier'):
+                            authors_info[row[author_name_key]] = {'identifier': identifier}
+                        else:
+                            authors_info[row[author_name_key]] = {}
+                    if 'affiliations' not in authors_info[row[author_name_key]]:
+                        authors_info[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
+                    else:
+                        authors_info[row[author_name_key]]['affiliations'].append(row[affiliation_key])
+        return authors_info
+
+    def safe_date_parse(self, date_str):
+        try:
+            return dateutil.parser.parse(date_str)
+        except (ParserError, ValueError):
+            return None
+
+    def create_talks(self, file_path, create_items=True, submit_items=True, overwrite=False):
+        df = self.parse_excel_table(file_path)
         request_list = []
+
         for index, row in df.iterrows():
-            print(f"generating requests for \"{row.get('Talk Title')}\"")
-            authors_info = get_authors_info(row)
-            request_list.append((row.get('Talk Title'), row.get('Event Name'), self.create_event_publication_request(
-                event_name=row.get('Event Name'),
-                start_date=safe_date_parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))),
-                end_date=safe_date_parse(str(row.get('Conference end date\n(dd.mm.YYYY)'))),
-                talk_date=safe_date_parse(str(row.get('Talk date\n(dd.mm.YYYY)'))),
-                location=row.get('Conference Location'),
-                invited=row.get('Invited (y/n)'),
-                title=row.get('Talk Title'),
-                authors_info=authors_info,
-            )))
+            print(f"Generating requests for \"{row.get('Talk Title')}\"")
+            authors_info = self.get_authors_info(row)
+
+            metadata_creators = []
+            for author, info in authors_info.items():
+                given_name, family_name = author.split(' ', 1)
+                affiliation_list = []
+                for affiliation in info['affiliations']:
+                    if affiliation in self.identifier_paths.keys():
+                        affiliation_list.append({"name": affiliation, "identifier": self.identifier_paths[affiliation][0], "identifierPath" : [ "" ]})
+                    else:
+                        affiliation_list.append({"name": affiliation, "identifier": 'ou_persistent22', "identifierPath" : [ "" ]})
+                identifier = info.get('identifier')
+                metadata_creators.append({
+                    "person": {
+                        "givenName": given_name,
+                        "familyName": family_name,
+                        "organizations": affiliation_list,
+                        "identifier": identifier
+                    },
+                    "role": "AUTHOR",
+                    "type": "PERSON"
+                })
+
+            request = {
+                "context": {
+                    "objectId": self.ctx_id,
+                    "name" : "",
+                    "lastModificationDate" : "",
+                    "creationDate" : "",
+                    "creator" : {
+                      "objectId" : ""
+                    },
+                },
+                "creator": {
+                    "objectId": self.user_id
+                },
+                "modifier": {
+                    "objectId": self.user_id
+                },
+                "localTags": [],
+                "metadata": {
+                    "title": row.get('Talk Title'),
+                    "creators": metadata_creators,
+                    "dateCreated": self.safe_date_parse(str(row.get('Talk date\n(dd.mm.YYYY)'))).strftime("%Y-%m-%d") if row.get('Talk date\n(dd.mm.YYYY)') else None,
+                    "datePublishedInPrint": "",
+                    "datePublishedOnline": "",
+                    "genre": "TALK_AT_EVENT",
+                    "event": {
+                        "endDate": self.safe_date_parse(str(row.get('Conference end date\n(dd.mm.YYYY)'))).strftime("%Y-%m-%d") if row.get('Conference end date\n(dd.mm.YYYY)') and row.get('Conference end date\n(dd.mm.YYYY)') != row.get('Conference start date\n(dd.mm.YYYY)') else None,
+                        "place": row.get('Conference Location'),
+                        "startDate": self.safe_date_parse(str(row.get('Conference start date\n(dd.mm.YYYY)'))).strftime("%Y-%m-%d"),
+                        "title": row.get('Event Name'),
+                        'invitationStatus': 'INVITED' if row.get('Invited (y/n)').strip().lower() == 'y' else None
+                    },
+                    "languages": ["eng"]
+                },
+                "files": []
+            }
+
+            request_list.append(({
+                    "metadata.title": row.get('Talk Title'),
+                    "metadata.event.title": row.get('Event Name')
+                }, request)
+            )
 
         if create_items:
-            item_ids = []
-            for talk_title, event_title, request_json in request_list:
-                print(f"Creating entry for title: {talk_title}")
-                existing_publication = self.search_publication_by_criteria({
-                    "metadata.title": talk_title,
-                    "metadata.event.title": event_title
+            self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
+
+    def create_publications(self, file_path, create_items=True, submit_items=True, overwrite=False):
+        df = self.parse_excel_table(file_path)
+        request_list = []
+
+        for index, row in df.iterrows():
+            print(f"Generating requests for \"{row.get('Title')}\"")
+            authors_info = self.get_authors_info(row)
+
+            metadata_creators = []
+            for author, info in authors_info.items():
+                given_name, family_name = author.split(' ', 1)
+                affiliation_list = []
+                for affiliation in info['affiliations']:
+                    if affiliation in self.identifier_paths.keys():
+                        affiliation_list.append({
+                            "name": affiliation,
+                            "identifier": self.identifier_paths[affiliation][0],
+                            "identifierPath": [""]
+                        })
+                    else:
+                        affiliation_list.append({
+                            "name": affiliation,
+                            "identifier": 'ou_persistent22',
+                            "identifierPath": [""]
+                        })
+                identifier = info.get('identifier')
+                metadata_creators.append({
+                    "person": {
+                        "givenName": given_name,
+                        "familyName": family_name,
+                        "organizations": affiliation_list,
+                        "identifier": identifier
+                    },
+                    "role": "AUTHOR",
+                    "type": "PERSON"
                 })
-                if existing_publication:
-                    if overwrite:
-                        print(f"Overwriting existing publication: '{talk_title}'; '{event_title}'")
-                        for pub in existing_publication:
-                            self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
-                    else:
-                        print(f"Publication already exists, skipping creation: '{talk_title}'; '{event_title}'")
-                        created_item = existing_publication[0]['data']
-                        item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
-                        continue
 
-                print(f"Creating new publication with title '{talk_title}'")
-                created_item = self.create_item(request_json)
-                item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
+            # Extracting other relevant information
+            date_created = self.safe_date_parse(str(row.get('Date created'))).strftime("%Y-%m-%d") if row.get('Date created') else None
+            date_issued = self.safe_date_parse(str(row.get('Date issued'))).strftime("%Y-%m-%d") if row.get('Date issued') else None
+            date_published = self.safe_date_parse(str(row.get('Date published'))).strftime("%Y-%m-%d") if row.get('Date published') else None
+            identifiers = self.journals.get(row.get('Journal Title', ''), {}).get('identifiers', {})
+            if 'ISSN' not in identifiers and row.get('ISSN'):
+                identifiers['ISSN'] = identifiers and row.get('ISSN')
+            identifiers_list = [{'type': key, 'id': id} for key, id in
+                                identifiers.items()]
 
-            if submit_items:
-                for item_id, modification_date, version_state in item_ids:
-                    if version_state not in ['PENDING', 'IN_REVISION']:
-                        print(f"Entry already has the state '{version_state}', skipping...")
-                    else:
-                        submitted_item = self.submit_item(item_id, modification_date)
-                        print(f"Submitted item: {submitted_item}")
+            sources = [{
+                'alternativeTitles': self.journals.get(row.get('Journal Title', ''), {}).get('alternativeTitles', []),
+                "genre": self.journals.get(row.get('Journal Title', ''), {}).get('genre', 'JOURNAL'),
+                "title": row.get('Journal Title'),
+                "publishingInfo":  self.journals.get(row.get('Journal Title', ''), {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
+                "volume": row.get('Volume'),
+                "issue": row.get('Issue'),
+                "startPage": row.get('Page').split('-')[0].strip() if row.get('Page') else None,
+                "endPage": row.get('Page').split('-')[-1].strip() if row.get('Page') else None,
+                "totalNumberOfPages":int(row.get('Page').split('-')[-1].strip()) -
+                                     int(row.get('Page').split('-')[0].strip()) + 1 if row.get('Page') else None,
+                "identifiers": identifiers_list,
+            }]
+            # Building the request dictionary
+            request = {
+                "context": {
+                    "objectId": self.ctx_id,
+                    "name": "",
+                    "lastModificationDate": "",
+                    "creationDate": "",
+                    "creator": {
+                        "objectId": ""
+                    },
+                },
+                "creator": {
+                    "objectId": self.user_id
+                },
+                "modifier": {
+                    "objectId": self.user_id
+                },
+                "localTags": [],
+                "metadata": {
+                    "title": row.get('Title'),
+                    "creators": metadata_creators,
+                    "dateCreated": date_created,
+                    "dateIssued": date_issued,
+                    "datePublishedOnline": date_published,
+                    "genre": 'ARTICLE',
+                    "identifiers": [
+                        {"id": row.get('DOI'), "type": "DOI"},
+                    ],
+                    "languages": ["eng"],
+                    "sources": sources
+                },
+                "files": []
+            }
+
+            request_list.append(({
+                    "metadata.title": row.get('Title'),
+                    "metadata.sources[0].title": row.get('Journal Title')
+                }, request)
+            )
+
+        if create_items:
+            self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
+
+
+    def create_items(self, request_list, submit_items=True, overwrite=False):
+        item_ids = []
+        for criteria, request_json in request_list:
+            print(f"Creating entry: {criteria}")
+            existing_publication = self.search_publication_by_criteria(criteria)
+            if existing_publication:
+                if overwrite:
+                    print(f"Overwriting existing publication: '{criteria}'")
+                    for pub in existing_publication:
+                        self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
+                else:
+                    print(f"Publication already exists, skipping creation: '{criteria}'")
+                    created_item = existing_publication[0]['data']
+                    item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
+                    continue
+
+            print(f"Creating new publication: '{criteria}'")
+            print("request_json",request_json)
+            created_item = self.create_item(request_json)
+            item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
+
+        if submit_items:
+            for item_id, modification_date, version_state in item_ids:
+                if version_state not in ['PENDING', 'IN_REVISION']:
+                    print(f"Entry already has the state '{version_state}', skipping...")
+                else:
+                    submitted_item = self.submit_item(item_id, modification_date)
+                    print(f"Submitted item: {submitted_item}")

@@ -3,3 +3,4 @@ Talks*
 *.pytest_cache
 *.vscode
 .env
+publications

@@ -1,0 +1,4314 @@
+' Journal of Physics: Energy':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: JPhys Energy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2515-7655
+    ISSN: 2515-7655
+  publishingInfo:
+    place: Bristol, UK
+    publisher: IOP Publishing, Thomas Sharp
+(Proc. ICOTOM 13):
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+'11':
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+2014 IEEE 40th Photovoltaic Specialist Conference, PVSC 2014:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-147994398-2
+    OTHER: Code 108691
+  publishingInfo: null
+2015 IEEE 42nd Photovoltaic Specialist Conference, PVSC 2015:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Piscataway Township, NJ, USA
+    publisher: Institute of Electrical and Electronics Engineers Inc.
+2019 Conference on Lasers and Electro-Optics Europe and European Quantum Electronics Conference, CLEO/Europe-EQEC 2019:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+30th ASM Heat Treating Society Conference and Exposition, Heat Treat 2019 - Extended Abstracts:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+3rd International Conference on High Manganese Steels, HMnS2016:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+'4':
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+7th International Conference on Magnesium Alloys and Their Applications, Proceedings:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-3-527-31764-6
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: Wiley VCH
+ACS Applied Electronic Materials:
+  alternativeTitles:
+  - type: OTHER
+    value: ACS appl. electron. mater.
+  - type: ABBREVIATION
+    value: ACS AEM
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2637-6113
+    ISSN: 2637-6113
+  publishingInfo: null
+ACS Applied Energy Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ACS Appl. Energy Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2574-0962
+    ISSN: 02574-0962
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+ACS Applied Materials and Interfaces:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ACS Appl. Mater. Interfaces
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1944-8244
+    ISSN: 1944-8244
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+ACS Catalysis:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ACS Catal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2155-5435
+    OTHER: 2155-5435
+  publishingInfo:
+    place: Washington, DC
+    publisher: ACS
+ACS Energy Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ACS Energy Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2380-8195
+    ISSN: 2380-8195
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+ACS Sustainable Chemistry & Engineering:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ACS Sustain. Chem. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2168-0485
+    ISSN: 2168-0485
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+AIP Advances:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/21583226
+    ISSN: 2158-3226
+  publishingInfo: null
+AIP Conference Proceedings:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+AISTech - Iron and Steel Technology Conference Proceedings:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+ASME/PVP:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 0-7918-3782-3, 978-0-7918-3782-5
+  publishingInfo: null
+Acat Materialia:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Acta Biomaterialia:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: '17427061'
+  publishingInfo:
+    publisher: Acta Materialia Inc
+Acta Crystallographica:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: 0108-7673
+  publishingInfo: null
+Acta Materialia:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Acta Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928603100
+    ISSN: 1359-6454
+  publishingInfo:
+    place: Kidlington
+    publisher: Elsevier Science
+Acta Mechanica:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925373809
+    ISSN: 0001-5970
+  publishingInfo:
+    place: Wien
+    publisher: Springer-Verlag.
+Acta Mechanica Sinica:
+  alternativeTitles:
+  - type: OTHER
+    value: Acta Mech. Sin.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978978553451
+    ISSN: 0567-7718
+  publishingInfo:
+    place: Beijing, China
+    publisher: Science Press
+Acta Metallurgica Sinica (English Letters):
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Acta Metall. Sin. (Engl. Lett.)
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1006-7191
+    ISSN: 1006-7191
+  publishingInfo:
+    place: 72 Wenhua Rd, Shenyang, 110016, China
+    publisher: Chinese Acad. Sciences, Inst. Metal. Research
+? 'Acta Physica Polonica A (Proceedings of the 12th International Symposium on Physics
+  of Materials)
+
+  '
+: alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925532977
+    ISSN: 0587-4246
+  publishingInfo:
+    place: Warszawa
+    publisher: "Pa\u0144stwowe Wydawnictwo Naukowe"
+Acta Physica Sinica:
+  alternativeTitles:
+  - type: OTHER
+    value: Acta Phys. Sin.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925584226
+    ISSN: 1000-3290
+  publishingInfo:
+    place: Beijing
+    publisher: Ke xue chu ban she
+Additive Manufacturing:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Addit. Manuf.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2214-8604
+    ISSN: 2214-8604
+  publishingInfo:
+    place: Amsterdam, The Netherlands
+    publisher: Elsevier B. V.
+Additive Manufacturing Letters:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2772-3690
+    ISSN: 2772-3690
+  publishingInfo:
+    publisher: Elsevier B.V.
+'Advanced Characterization Techniques for Thin Film Solar Cells: Second Edition':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Hoboken, NJ, USA
+    publisher: wiley
+Advanced Energy Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Energy Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1614-6832
+    OTHER: 1614-6832
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH
+Advanced Energy and Sustainability Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Advanced Engineering Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Eng. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/958634688014
+    ISSN: 1438-1656
+  publishingInfo:
+    place: Weinheim
+    publisher: WILEY-VCH Verlag
+Advanced Functional Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Funct. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925596563
+    ISSN: 1616-301X
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH Verlag GmbH
+Advanced Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925570855
+    ISSN: 0935-9648
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH
+Advanced Materials Research:
+  alternativeTitles:
+  - value: Adv. Mater. Res.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Advanced Modeling and Simulation in Engineering Sciences:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Model. and Simul. in Eng. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2213-7467
+    ISSN: 2213-7467
+  publishingInfo: null
+Advanced Optical Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Adv. Opt. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2195-1071
+    ISSN: 2195-1071
+  publishingInfo: null
+Advanced Science:
+  alternativeTitles:
+  - type: OTHER
+    value: Adv. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2198-3844
+    ISSN: 2198-3844
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH
+Advances in Science and Technology:
+  alternativeTitles:
+  - value: Adv. Sci. Tech.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Ancient Weapons, New Research Perspectives on Weapons and Warfare:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Mainz, Germany
+    publisher: Verlag des RGZM
+Angewandte Chemie International Edition:
+  alternativeTitles:
+  - type: OTHER
+    value: Angew. Chem., Int. Ed.
+  - type: OTHER
+    value: Angew. Chem. Int. Ed.
+  - type: OTHER
+    value: Angewandte Chemie, International Edition
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1433-7851
+    ISSN: 1433-7851
+  publishingInfo:
+    place: Weinheim
+    publisher: 'Wiley-VCH '
+Angewandte Chemie, International Edition in English:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Angew. Chem., Int. Ed. Engl.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0570-0833
+    ISSN: 0570-0833
+  publishingInfo: null
+Annual Review of Materials Research:
+  alternativeTitles:
+  - type: OTHER
+    value: Ann. Rev. Mater. Res.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925460108
+    ISSN: 1531-7331
+  publishingInfo:
+    place: Palo Alto, Calif.
+    publisher: Annual Reviews
+Applied Materials Today:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Appl. Mater. Today
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/23529407
+    ISSN: 2352-9407
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Applied Mechanics and Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Appl. Mech. Mater.
+  genre: PROCEEDINGS
+  identifiers:
+    CONE: /journals/resource/16609336
+    ISSN: '16609336'
+  publishingInfo:
+    place: "Z\xFCrich, Switzerland"
+    publisher: Trans Tech Publications Ltd
+Applied Phys. Letters:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Applied Physics A:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Appl. Phys. A
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928582869_1
+    ISSN: 0947-8396
+  publishingInfo:
+    place: Heidelberg
+    publisher: Springer-Verlag Heidelberg
+Applied Physics Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Appl. Phys. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954922836223
+    OTHER: 0003-6951
+  publishingInfo: null
+Applied Surface Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Appl. Surf. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928576736
+    ISSN: 0169-4332
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+Archive of Applied Mechanics:
+  alternativeTitles:
+  - type: OTHER
+    value: Arch. Appl. Mech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928488327
+    ISSN: 0939-1533
+  publishingInfo:
+    place: New York, NY
+    publisher: Springer International
+Archives of Computational Methods in Engineering:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Arch Computat Methods Eng
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1134-3060
+    ISSN: 1134-3060
+  publishingInfo: null
+"Arch\xE4ologisches Korrespondenzblatt":
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Archaol. Korresp.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978977979832
+    ISSN: 0342-734X
+  publishingInfo:
+    place: Mainz am Rhein
+    publisher: Verlag P. von Zabern.
+Arthropod structure & development:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925407738
+    ISSN: 1467-8039
+  publishingInfo:
+    publisher: Elsevier
+Astronomy and Astrophysics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Batteries & Supercaps:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Batter. Supercaps
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2566-6223
+    ISSN: 2566-6223
+  publishingInfo:
+    place: Weinheim
+    publisher: WILEY-VCH Verlag GmbH & Co. KGaA
+"Beherrschung von W\xE4rmeprozessen im Fertigungsablauf":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Bremen, Germany
+    publisher: Selbstverlag
+Bericht XXIV. Verformungskundliche Kolloquium:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Berichte aus dem Institut f\xFCr Eisenh\xFCttenkunde":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+BioGeoCivil Engineering:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+BioNanoMaterials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2193-066X
+    ISSN: 2193-066X
+  publishingInfo: null
+Bioinspiration & Biomimetics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Bioinspir. Biomim.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1748-3190
+    ISSN: '17483182 '
+    OTHER: '1748-3190 '
+  publishingInfo:
+    place: London
+    publisher: Inst. of Physics
+Bioinspired, Biomimetic and Nanobiomaterials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Bioinspired Biomim. Nanobiomaterials
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2045-9858
+    ISSN: 2045-9858
+  publishingInfo:
+    publisher: Thomas Telford Ltd
+Biological Journal of the Linnean Society:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954922646052
+    ISSN: 0024-4066
+  publishingInfo:
+    place: London
+    publisher: Wiley
+'Biology of the sauropod dinosaurs: understanding the life of giants':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Bloomington and Indianapolis
+    publisher: Indiana University Press
+Biomicrofluidics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Biophysical Journal:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Biotribology:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Biotribology
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2352-5738
+    ISSN: 2352-5738
+  publishingInfo:
+    place: Oxford OX5 1, United Kingdom
+    publisher: Elsevier Ltd.
+Bulgarian Chemical Communications:
+  alternativeTitles:
+  - type: OTHER
+    value: Bulg. Chem. Commun.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0861-9808
+    ISSN: 0861-9808
+  publishingInfo:
+    place: Bulgaria
+    publisher: Bulgarian Academy of Sciences
+Bulk Nanostructured Materials:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: Wiley-VCH
+CMC - Computers, Materials, & Continua:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+CP982, Complex Systems, 5th International Workshop on Complex Systems:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    publisher: AIP Publishing
+Carbon:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Carbon
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925388220
+    ISSN: 0008-6223
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Catalysts:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2073-4344
+    OTHER: 2073-4344
+  publishingInfo:
+    place: Basel
+    publisher: MDPI
+Ceramic Transactions Series:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-470-44419-1
+    ISSN: 1042-1122
+  publishingInfo:
+    place: Westerville, OH, 43081-8720 USA
+    publisher: Amer Ceramic Soc, 735 Ceramic Place
+Ceramics International:
+  alternativeTitles:
+  - value: Ceram. Int.
+  genre: JOURNAL
+  identifiers:
+    ISSN: 0272-8842
+  publishingInfo: null
+ChemElectroChem:
+  alternativeTitles:
+  - value: ChemElectroChem
+  genre: JOURNAL
+  identifiers:
+    ISBN: 2196-0216
+  publishingInfo:
+    publisher: John Wiley & Sons, Ltd
+Chemical Geology:
+  alternativeTitles:
+  - type: OTHER
+    value: Chem. Geol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925389240
+    ISSN: 0009-2541
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Chemical Reviews:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Chem. Rev.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925389243
+    ISSN: 0009-2665
+  publishingInfo:
+    place: Washington, DC.
+    publisher: American Chemical Society
+Chemistry of Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Chem. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925561571
+    ISSN: 0897-4756
+  publishingInfo:
+    place: Washington, D.C.
+    publisher: American Chemical Society
+"Chemistry \u2013 A European Journal":
+  alternativeTitles:
+  - type: OTHER
+    value: "Chem. \u2013 Eur. J."
+  - type: OTHER
+    value: Chem. Eur. J.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926979058
+    ISSN: 0947-6539
+  publishingInfo: null
+Chernye Metally:
+  alternativeTitles:
+  - type: OTHER
+    value: Ferrous Metals
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0132-0890
+    ISSN: 0132-0890
+  publishingInfo:
+    place: Moscow, Russia
+    publisher: Ore and Metals Publishing House
+Chitin:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978-90-481-9683-8
+  publishingInfo:
+    place: Germany
+    publisher: Springer
+Communications Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2399-3650
+    ISSN: 2399-3650
+  publishingInfo:
+    place: London
+    publisher: Nature Publishing Group
+Communications in Computational Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Composites Part B: Engineering':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Compos. B. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1359-8368
+    ISSN: 1359-8368
+  publishingInfo:
+    place: Oxford, UK
+    publisher: Elsevier B.V.
+Composites Science and Technology:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Computational Materials Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Comput. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925567766
+    ISSN: 0927-0256
+  publishingInfo:
+    place: Amsterdam
+    publisher: 'Elsevier '
+Computational Mechanics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Comput. Mech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/01787675
+    ISSN: 0178-7675
+  publishingInfo:
+    place: 'Berlin ; Heidelberg '
+    publisher: Springer
+Computer Methods in Applied Mechanics and Engineering:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Comput. Methods in Appl. Mech. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925455953
+    ISSN: 0045-7825
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+Computer Methods in Materials Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Comput. Methods Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1641-8581
+    ISSN: 1641-8581
+  publishingInfo:
+    publisher: The AGH University of Science and Technology Press
+Computer Physics Communications:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Comput. Phys. Commun.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925392326
+    ISSN: 0010-4655
+  publishingInfo: null
+Computers & Mathematics with Applications:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Computers, Materials & Continua:
+  alternativeTitles:
+  - value: CMC
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Condensed Matter: Materials Science':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: cond-mat.mtrl-sci
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/arXiv:1701.06694
+    ISSN: arXiv:1701.06694
+  publishingInfo: null
+Conf. Proc. Steel for Cars and Trucks:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: "D\xFCsseldorf"
+    publisher: Stahleisen GmbH
+Conference Proceedings of the Society for Experimental Mechanics Series:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Continuum Mechanics and Thermodynamics:
+  alternativeTitles:
+  - type: OTHER
+    value: Continuum Mech. Thermodyn.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925570848
+    ISSN: 0935-1175
+  publishingInfo:
+    place: Berlin
+    publisher: Springer International
+Continuum Scale Simulation of Engineering Materials:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 3-527-30760-5
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH
+Contributions to Mineralogy and Petrology:
+  alternativeTitles:
+  - type: OTHER
+    value: Contrib. Mineral. Petrol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110985822454566
+    ISSN: 0010-7999
+  publishingInfo:
+    publisher: Springer
+Contributions to the Foundations of Multidisciplinary Research in Mechanics:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-660-05459-9
+  publishingInfo:
+    publisher: IUTAM
+Corrosion 2016:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Houston, Texas 77084
+    publisher: NACE International, Publications Division, 15835 Park Ten Place
+Corrosion Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Corros. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925393343
+    ISSN: 0010-938X
+  publishingInfo:
+    place: Amsterdam
+    publisher: Pergamon
+Crystal Growth and Design:
+  alternativeTitles:
+  - value: Cryst. Growth Des.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Crystal Research and Technology:
+  alternativeTitles:
+  - value: Cryst. Res. Technol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Crystals:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2073-4352
+    ISSN: 2073-4352
+  publishingInfo:
+    place: Basel, Switzerland
+    publisher: MDPI AG
+Current Opinion in Solid State and Materials Science:
+  alternativeTitles:
+  - type: OTHER
+    value: Curr. Opin. in Solid St. M.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925618126
+    ISSN: 1359-0286
+  publishingInfo:
+    place: London, UK
+    publisher: Elsevier
+DFG Abschlusskolloquium Erweiterung der Formgebungsgrenzen bei Umformprozessen:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 3-86130-416-3
+  publishingInfo:
+    place: Aachen, Germany
+    publisher: Verlagshaus Mainz
+DISLOCATIONS 2012:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-615-5270-01-7
+  publishingInfo: null
+Data in Brief:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2352-3409
+    ISSN: 2352-3409
+  publishingInfo:
+    place: Dordrecht
+    publisher: Elsevier
+Defect and Diffusion Forum:
+  alternativeTitles:
+  - value: Defect Diffus. Forum
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Defects and Diffusion Forum:
+  alternativeTitles:
+  - value: Defects Diffus. Forum
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Diffusion and Defect Data Part B Solid State Phenomena:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: '3908451094'
+    ISSN: 0377-6883
+  publishingInfo: null
+Dislocations, Plasticity and Metal Forming:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Fulton, Maryland, USA
+    publisher: Neat Press
+'Dislocations, Plasticity, Damage and Metal Forming: Material Response and Multiscale Modeling':
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Fulton, Maryland, USA
+    publisher: Neat Press
+"EBSD: Analyse par diffraction des \xE9lectrons r\xE9trodiffus\xE9s":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Paris, France
+    publisher: "Fran\xE7ois, B., GN-MEBA"
+ECS Meeting Abstracts:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Meet. Abstr.
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 2151-2043
+  publishingInfo:
+    publisher: The Electrochemical Society
+? 'EMAS 2015 - 14th European Workshop on Modern Developments and Applications in Microbeam
+  Analysis: Book of Tutorials and Abstracts'
+: alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo: null
+EPJ Web of Conferences:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+EPL:
+  alternativeTitles:
+  - type: OTHER
+    value: Europhysics Letters
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0295-5075
+    OTHER: 0295-5075
+  publishingInfo:
+    place: Bristol
+    publisher: IoPP
+EPL - Europhysics Letters:
+  alternativeTitles:
+  - value: EPL
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+EUROCORR 2017 - The Annual Congress of the European Federation of Corrosion:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Earth and Planetary Science Letters:
+  alternativeTitles:
+  - type: OTHER
+    value: Earth Planet. Sci. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925395406
+    ISSN: 0012-821X
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Effects of Hydrogen on Materials:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-1-61503-003-3
+  publishingInfo:
+    place: Materials Park, OH 44073-0002, USA
+    publisher: ASM International
+Effects of Hydrogen on Materials, Proceedings of the 2008 International Hydrogen Conference (ASM International):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: '9781615030033'
+  publishingInfo:
+    place: Materials Park, OH, USA
+    publisher: ASM International
+Electrical Contacts, 2017 IEEE Holm Conference on:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    publisher: IEEE
+Electrochemistry Communucations:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Electrochem. Commun.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925622231
+    ISSN: 1388-2481
+  publishingInfo: null
+Electrochimica Acta:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Electrochim. Acta
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925396434
+    ISSN: 0013-4686
+  publishingInfo:
+    place: Oxford, UK
+    publisher: Pergamon-Elsevier Science Ltd
+Energy & Environmental Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Energy Environ. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1754-5692
+    ISSN: 1754-5692
+  publishingInfo: null
+Energy Science & Engineering:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Energy Sci. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2050-0505
+    ISSN: 2050-0505
+  publishingInfo:
+    place: London, UK
+    publisher: Society of Chemical Industry and John Wiley & Sons, Ltd
+Engineering Fracture Mechanics:
+  alternativeTitles:
+  - type: OTHER
+    value: Eng. Fract. Mech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925397446
+    ISSN: 0013-7944
+  publishingInfo: null
+Entropy:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978984445793
+    ISSN: 1099-4300
+  publishingInfo:
+    place: Basel
+    publisher: Molecular Diversity Preservation International
+Environmental Science and Technology:
+  alternativeTitles:
+  - value: Environ. Sci. Technol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Erken Tun\xE7 \xC7a\u011F\u0131nda Murat H\xF6y\xFCk":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISSN: '9786057673909 '
+  publishingInfo:
+    place: Istanbul, Turkey
+    publisher: Ege Publications
+European Journal of Mechanics - A/Solid:
+  alternativeTitles:
+  - type: OTHER
+    value: Eur. J. Mech. A/Solid
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0997-7538
+    ISSN: 0997-7538
+  publishingInfo:
+    publisher: Elsevier BV
+European Journal of Mechanics A/Solids:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+European Physics Journal Plus:
+  alternativeTitles:
+  - value: Eur. Phys. J. Plus
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+European Polymer Journal:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+European Synchrotron Radiation Facility Highlights 2011:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Europhysics Letters:
+  alternativeTitles:
+  - value: Europhys. Lett.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Experimental Mechanics:
+  alternativeTitles:
+  - type: OTHER
+    value: Exp. Mech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0014-4851
+    ISSN: 0014-4851
+  publishingInfo:
+    publisher: Springer Nature
+Focus Issue on Instrumented Indentation:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+? "Frontiers in Materials\r\nStructural Materials"
+: alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Frontiers in Materials ':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Front. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2296-8016
+    ISSN: 2296-8016
+  publishingInfo: null
+Frontiers of Materials Science in China:
+  alternativeTitles:
+  - value: Front. Mater. Sci. China
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Fundamentals of Deformation and Annealing Symposium:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Fusion Science and Technology:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+GAMM-Mitteilungen:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: GAMM-Mitt.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1522-2608
+    ISSN: 1522-2608
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: 'WILEY-VCH Verlag GmbH & Co. KGaA '
+GIT Imaging & Microscopy:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Genf-Experimental Report 2003:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Handbook of Damage Mechanics: Nano to Macro Scale for Materials and Structures':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978-1-4614-5588-2
+  publishingInfo:
+    place: New York Inc.
+    publisher: Springer-Verlag
+Handbook of Materials Modeling:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Netherlands
+    publisher: Springer
+Handbook of Mechanics of Materials:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Singapore
+    publisher: Springer
+Handbook of Software Solutions for ICME:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: ' 9783527693566'
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: Wiley-VCH Verlag GmbH & Co. KGaA
+High Entropy Alloys & Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2731-5827
+    ISSN: 2731-5827
+  publishingInfo:
+    place: Switzerland
+    publisher: Springer Nature
+High-Performance Ferrous Alloys:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978-3-030-53824-8
+  publishingInfo:
+    place: Cham, Switzerland
+    publisher: Springer Nature Switzerland
+IEEE Journal of Photovoltaics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: IEEE J. Photovolt.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2156-3381
+    ISSN: 2156-3381
+  publishingInfo:
+    place: USA
+    publisher: IEEE Electron Devices Society
+IEEE Transactions on Magnetics:
+  alternativeTitles:
+  - value: IEEE Trans. Magn.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+IF STEELS 2003:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Japan
+    publisher: The Iron and Steel Institute of Japan
+'IOP Conf. Series: Materials Science and Engineering':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: 'IOP Conf. Ser.: Mater. Sci. Eng.'
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'IOP Conference Series: Materials Science and Engineering':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: IOP Conf. Ser., Mater. Sci. Eng.
+  genre: PROCEEDINGS
+  identifiers:
+    CONE: /journals/resource/1757-8981
+    ISSN: 1757-8981
+  publishingInfo:
+    place: Bristol, England
+    publisher: Institute of Physics Publishing (IOP)
+? 'IOP Conference Series: Materials Science and Engineering
+
+  '
+: alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    publisher: 'IOP Publishing '
+ISIJ International:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: ISIJ Int.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928489357
+    ISSN: 0915-1559
+  publishingInfo:
+    place: Tokyo
+    publisher: "\u793E\u56E3\u6CD5\u4EBA \u65E5\u672C\u9244\u92FC\u5354\u4F1A"
+ISSS 2017, Proceedings of the 5th International Symposium on Steel Science:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Tokyo, Japan
+    publisher: The Iron and Steel Institute of Japan
+'IUTAM Symposium on Linking Scales in Computations: From Microstructure to Macro-scale Properties':
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+Imaging & Microscopy:
+  alternativeTitles:
+  - value: Imaging Microsc.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Inorganic Chemistry:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Inorg. Chem.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0020-1669
+    ISSN: 0020-1669
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+Int. J. Materials Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Integrating Materials and Manufacturing Innovation:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: IMMI
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2193-9764
+    ISSN: 2193-9764
+  publishingInfo:
+    place: Berlin Heidelberg
+    publisher: 'Springer '
+Inter. Journal of Materials Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Intermetallics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Intermetallics
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+International Conference Super-High Strength Steels:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Milano, Italy
+    publisher: Associazione Italiana di Metallurgia (AIM)
+International Conference, New Developments on Metallurgy and Applications of High Strength Steels:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-87339-729-2
+  publishingInfo: null
+International Journal for Multiscale Computational Engineering:
+  alternativeTitles:
+  - value: Int. J. Mult. Comput. Eng.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'International Journal for Numerical Methods in Engineering ':
+  alternativeTitles:
+  - type: OTHER
+    value: Int. J. Numer. Meth. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1097-0207
+    ISSN: 1097-0207
+  publishingInfo:
+    publisher: ' John Wiley & Sons Ltd'
+International Journal of Advanced Manufacturing Technology:
+  alternativeTitles:
+  - value: Int. J. of Adv. Manuf. Tech.
+  genre: JOURNAL
+  identifiers:
+    ISSN: 1433-3015
+  publishingInfo: null
+International Journal of Fatigue:
+  alternativeTitles:
+  - type: OTHER
+    value: Int. J. Fatigue
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925471357
+    ISSN: 0142-1123
+  publishingInfo: null
+International Journal of Hydrogen Energy:
+  alternativeTitles:
+  - type: OTHER
+    value: Int. J. Hydrog. Energy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925521672
+    ISSN: 0360-3199
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+International Journal of Machine Tools and Manufacture:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+International Journal of Material Forming:
+  alternativeTitles:
+  - value: Int J Metal Forming
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Heidelberg
+    publisher: Springer Paris
+International Journal of Materials Research:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Int. J. Mat. Res.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925453910
+    ISSN: 1862-5282
+  publishingInfo:
+    place: "M\xFCnchen, Germany"
+    publisher: Hanser
+International Journal of Mechanical Sciences:
+  alternativeTitles:
+  - type: OTHER
+    value: IJMS
+  - type: ABBREVIATION
+    value: Int. J. Mech. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0020-7403
+    ISSN: 0020-7403
+  publishingInfo:
+    place: Oxford, England
+    publisher: Elsevier Limited
+International Journal of Minerals, Metallurgy and Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Int. J. Miner. Metall. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1674-4799
+    ISSN: 1674-4799
+  publishingInfo: null
+International Journal of Modern Physics B:
+  alternativeTitles:
+  - value: Int. J. Mod. Physics B
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+International Journal of Plasticity:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Int. J. Plast.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925544230
+    ISSN: 0749-6419
+  publishingInfo:
+    place: New York
+    publisher: Pergamon
+International Journal of Solids and Structures:
+  alternativeTitles:
+  - type: OTHER
+    value: Int. J. Solids Struct.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925407747
+    ISSN: 0020-7683
+  publishingInfo: null
+International Materials Reviews:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Int. Mater. Rev.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0950-6608
+    ISSN: 0950-6608
+  publishingInfo:
+    place: Philadelphia, PA
+    publisher: Taylor & Francis
+Iron and Steel Institute of Japan International:
+  alternativeTitles:
+  - value: ISIJ Int.
+  genre: JOURNAL
+  identifiers:
+    ISSN: 0915-1559
+  publishingInfo: null
+J. Mat. Proc. Technol.:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+JEC Composites Magazine:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+JEOL News:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+JOM:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926962934_1
+    DOI: 10.1007/s11837-014-1192-8
+    ISSN: 1047-4838
+  publishingInfo: null
+JOM-Journal of the Minerals Metals & Materials Society:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: JOM-J. Miner. Met. Mater. Soc.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926962934
+    ISSN: 1047-4838
+  publishingInfo:
+    place: Warrendale, PA, USA
+    publisher: The Minerals, Metals and Materials Society (TMS)
+'JOM: the Journal of the Minerals, Metals & Materials Society (TMS)':
+  alternativeTitles:
+  - value: JOM
+  genre: JOURNAL
+  identifiers:
+    ISSN: 1047-4838
+  publishingInfo: null
+Jahrbuch 2017 der Max-Planck-Gesellschaft:
+  alternativeTitles: null
+  genre: COLLECTED_EDITION
+  identifiers: {}
+  publishingInfo:
+    place: "M\xFCnchen, Germany"
+    publisher: Max-Planck-Gesellschaft
+Journal of Alloys and Compounds:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Alloy. Comp.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925567746
+    ISSN: 0925-8388
+  publishingInfo:
+    place: Lausanne, Switzerland
+    publisher: Elsevier B.V.
+Journal of Applied Crystallography:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Appl. Cryst.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925410812
+    ISSN: 0021-8898
+  publishingInfo:
+    place: Oxford, England
+    publisher: Blackwell Publishing on behalf of the International Union of Crystallography
+Journal of Applied Physics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Appl. Phys.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042723401880
+    ISSN: 0021-8979
+  publishingInfo: null
+Journal of Archaeological Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Archaeol. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954922648108
+    ISSN: 0305-4403
+  publishingInfo: null
+Journal of Biomedical Materials Research Part B-Applied Biomaterials:
+  alternativeTitles:
+  - type: OTHER
+    value: J. Biomed. Mater. Res. Part B
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925411829
+    ISSN: 1552-4973
+  publishingInfo:
+    place: Hoboken, NJ
+    publisher: John Wiley & Sons
+Journal of Chemical Physics:
+  alternativeTitles:
+  - value: J. Chem. Phys.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Chemical Technology & Biotechnology:
+  alternativeTitles:
+  - value: J. Chem. Technol. Biotechnol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Cleaner Production:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J Cleaner Prod.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0959-6526
+    ISSN: 0959-6526
+  publishingInfo: null
+Journal of Composite Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Crystal Growth:
+  alternativeTitles:
+  - value: J. Cryst. Growth
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Dynamic Behavior of Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Dyn. Behav. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/21997446, 21997454
+    ISSN: 21997446, 21997454
+  publishingInfo:
+    place: Switzerland
+    publisher: Springer International Publishing AG
+Journal of Elasticity:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Elast.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925525792
+    ISSN: 0374-3535
+  publishingInfo:
+    place: Groningen
+    publisher: Sijthoff & Noordhoff International Pub., [etc.]
+Journal of Electronic Materials:
+  alternativeTitles:
+  - value: JEM
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Engineering and Materials Technology:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Fluid Mechanics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Functional Biomaterials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Funct. Biomater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2079-4983
+    ISBN: 2079-4983
+  publishingInfo:
+    place: Basel, Switzerland
+    publisher: MDPI
+Journal of Iron and Steel Research International:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Iron Steel Inst.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1006-706X
+    ISSN: '00211575'
+  publishingInfo: null
+Journal of Magnesium and Alloys:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Magnes. Alloys
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/22139567
+    ISSN: '22139567'
+  publishingInfo:
+    place: China
+    publisher: National Engineering Research Center for Magnesium Alloys of China,
+      Chongqing University
+Journal of Magnetism and Magnetic Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Magn. Magn. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925512464
+    ISSN: 0304-8853
+  publishingInfo:
+    place: Amsterdam
+    publisher: NH, Elsevier
+Journal of Manufacturing Science and Engineering, Transactions of the ASME:
+  alternativeTitles:
+  - type: OTHER
+    value: J. Manuf. Sci. Eng.-Trans. ASME
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926946760
+    ISSN: 1087-1357
+  publishingInfo:
+    place: New York, NY
+    publisher: American Society of Mechanical Engineers
+Journal of Material Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Materials Chemistry A:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mater. Chem. A
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2050-7488
+    ISSN: 2050-7488
+  publishingInfo: null
+Journal of Materials Chemistry B:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2050-750X
+    ISSN: 2050-750X
+  publishingInfo:
+    place: Cambridge, UK
+    publisher: Royal Society of Chemistry
+Journal of Materials Engineering and Performance:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mater. Eng. Perform.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/10599495, 15441024
+    ISSN: 10599495, 15441024
+  publishingInfo: null
+Journal of Materials Processing Technology:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mater. Process. Technol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928575727
+    ISSN: 0924-0136
+  publishingInfo: null
+Journal of Materials Research:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mater. Res.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925550339
+    ISSN: 0884-2914
+  publishingInfo:
+    place: Pittsburgh, PA
+    publisher: Published for the Materials Research Society by the American Institute
+      of Physics
+Journal of Materials Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925415936_1
+    ISSN: 0022-2461
+  publishingInfo:
+    place: New York, NY, USA
+    publisher: Springer
+Journal of Materials Science & Technology:
+  alternativeTitles:
+  - type: OTHER
+    value: J. Mater. Sci. Technol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925584235
+    ISSN: 1005-0302
+  publishingInfo:
+    place: Shenyang, China
+    publisher: Editorial Board of Journal of Materials Science and Technology
+'Journal of Materials Science: Materials in Electronics':
+  alternativeTitles:
+  - type: OTHER
+    value: J. Mater. Sci. - Mater. El.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925577043
+    ISSN: 0957-4522
+  publishingInfo:
+    place: London
+    publisher: Chapman and Hall
+Journal of Microscopy:
+  alternativeTitles:
+  - value: JOM
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Morphology:
+  alternativeTitles:
+  - value: J. Morphol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Neutron Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Non-Equilibrium Thermodynamics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Non-Equilib. Thermodyn.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925620172
+    ISSN: 0340-0204
+  publishingInfo:
+    publisher: Walter de Gruyter
+Journal of Nondestructive Evaluation:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Nuclear Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Nucl. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925416962
+    ISSN: 0022-3115
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+'Journal of Petroleum Science and Engineering ':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Pet. Sci. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0920-4105
+    ISSN: 0920-4105
+  publishingInfo:
+    publisher: Elsevier B.V.
+Journal of Phase Equilibra and Diffusion:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Phase Equilib. Diff.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925595536
+    ISSN: 1547-7037
+  publishingInfo:
+    place: Materials Park, Ohio
+    publisher: ASM International
+Journal of Phase Equilibria and Diffusion:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Phase Equilib. Diff.
+  - {}
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111085426357000
+    ISSN: '1547-7037 '
+  publishingInfo:
+    place: New York, NY
+    publisher: Elsevier Science Pub. Co.
+Journal of Photovoltaics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Journal of Physics D: Applied Physics':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: 'J. Phys. D: Appl. Phys.'
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0022-3727
+    ISSN: 0022-3727
+  publishingInfo: null
+Journal of Physics, Conference Series:
+  alternativeTitles:
+  - value: J. Phys., Conf. Ser.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Physics-Condensed Matter:
+  alternativeTitles:
+  - value: J. Phys.-Condens. Matter
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Journal of Physics: Condensed Matter':
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928562478
+    ISSN: 0953-8984
+  publishingInfo: null
+'Journal of Physics: Conference Series':
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Journal of Physics:Conference Series:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Structural Biology:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Struct. Biol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954922650160
+    ISSN: 1047-8477
+  publishingInfo:
+    place: San Diego, CA
+    publisher: Elsevier
+Journal of Syncroton Radiation:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Thermal Spray Technology:
+  alternativeTitles:
+  - value: J. Therm. Spray Technol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Thrombosis and Haemostasis:
+  alternativeTitles:
+  - type: OTHER
+    value: J. Thromb. Haemost.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042728117902
+    ISSN: 1538-7933
+  publishingInfo:
+    place: Oxford
+    publisher: Blackwell Pub., c2003-
+Journal of Visualized Experiments:
+  alternativeTitles:
+  - value: J. Vis. Exp.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of Volcanology and Geothermal Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925525812
+    ISSN: 0377-0273
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Journal of the American Chemical Society:
+  alternativeTitles:
+  - type: OTHER
+    value: JACS
+  - type: ABBREVIATION
+    value: J. Am. Chem. Soc.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925376870
+    ISSN: 0002-7863
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+Journal of the Electrochemical Society:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Electrochem. Soc.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042748197686
+    ISSN: 0013-4651
+  publishingInfo:
+    place: New York, NY, USA
+    publisher: Electrochemical Society
+Journal of the European Ceramic Society:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Journal of the Mechanical Behavior of Biomedical Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1751-6161
+    ISSN: 1751-6161
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Journal of the Mechanics and Physics of Solids:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Mech. Phys. Solids
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925419037
+    ISSN: 0022-5096
+  publishingInfo:
+    place: London
+    publisher: Pergamon
+Journal of the Optical Society of America B-Optical Physics:
+  alternativeTitles:
+  - type: OTHER
+    value: J. Opt. Soc. Am. B-Opt. Phys.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954927560576
+    ISSN: 0740-3224
+  publishingInfo:
+    place: Washington, D.C.
+    publisher: The Society
+"Journ\xE9es Jeunes Chercheurs, Interactions Hydrogen-Mat\xE9riaux et Corrosion-D\xE9formation":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Key Engineering Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Key Eng. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928607151
+    ISSN: 1013-9826
+  publishingInfo:
+    place: Aedermannsdorf, Switzerland
+    publisher: Trans Tech Publications
+Kurzfassung Forschungsprojekt AiF 13409 N:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Germany
+    publisher: "Verband Deutscher Federindustrie VDFI \u2013 Goldene Pforte \u2013\
+      \ D-58093 Hagen"
+L'Analyse EBSD, Principes et Applications:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+La Houille Blanche, International Water Journal:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Langmuir:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925541194
+    ISSN: 0743-7463
+  publishingInfo: null
+"Le Revue de M\xE9tallurgie":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Lecture Notes in Applied and Computational Mechanics:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISSN: '16137736'
+  publishingInfo:
+    publisher: Springer Verlag
+LightMat 2017:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Berlin, Germany
+    publisher: DGM
+MATEC Web of Conferences:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: MATEC Web Conf.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2557-0250
+    ISSN: 2557-0250
+  publishingInfo:
+    publisher: edp sciences
+MRS Bulletin:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: MRS Bull.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925549328
+    ISSN: 0883-7694
+  publishingInfo:
+    place: Warrendale, PA, USA
+    publisher: Materials Research Society
+MRS Communications:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2159-6859
+    ISSN: 2159-6859
+  publishingInfo: null
+MRS Fall Meeting 2009:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+MRS Fall Meeting 2009 Proceedings:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISSN: 02729172
+  publishingInfo: null
+MRS Proceedings:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+MS&T, Materials Science and Technology:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Warrendale, PA, USA
+    publisher: Materials Science and Technology Conference
+MSI Eureka:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Stuttgart
+    publisher: MSI, Materials Science International Services GmbH
+Magnesium Technology 2012:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: USA
+    publisher: Wiley
+Mater. Res. Soc. Symp. Proc.:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Mater. Res. Soc. Sympos. Proc.:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Material & Technik, Bionanokomposite:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+Material Chemistry and Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Material Science Forum:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Material Science and Engineering A:
+  alternativeTitles:
+  - value: Mater. Sci. Eng. A
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materialia:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Materialia
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2589-1529
+    ISSN: 2589-1529
+  publishingInfo:
+    publisher: Elsevier Ltd.
+"Materialpr\xFCfung / Materials Testing":
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Test.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/958480286301
+    ISSN: 0025-5300
+  publishingInfo:
+    place: "M\xFCnchen, Germany"
+    publisher: Carl Hanser Verlag GmbH & Co. KG
+Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Materials
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1996-1944
+    ISSN: 1996-1944
+  publishingInfo:
+    place: Basel
+    publisher: MDPI
+Materials Characterization:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Charact.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928499483
+    ISSN: 1044-5803
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Materials Chemistry and Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928577762
+    ISSN: 0254-0584
+  publishingInfo: null
+'Materials Design Inspired by Nature: Function Through Inner Architecture (CHAPTER 9)':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo: null
+Materials Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925483654
+    ISSN: 0167-577X
+  publishingInfo:
+    place: Amsterdam
+    publisher: North-Holland
+'Materials Processing and Design: Modeling, Simulation and Applications':
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    publisher: American Institute of Physics
+Materials Processing and Properties:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-87339-751-3
+  publishingInfo:
+    publisher: TMS
+Materials Processing and Texture:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Hoboken, NJ, USA
+    publisher: John Wiley & Sons, Inc.
+Materials Research Letters:
+  alternativeTitles:
+  - type: OTHER
+    value: Mat. Res. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2166-3831
+    OTHER: 2166-3831
+  publishingInfo:
+    place: London
+    publisher: Taylor & Francis
+Materials Research Society Symposia Proceedings:
+  alternativeTitles:
+  - value: Mater. Res. Soc. Symp. Proc.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materials Research Society Symposium Proceedings:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978978378769
+    ISBN: 978-160511272-5
+    ISSN: 0272-9172
+  publishingInfo:
+    place: New York
+    publisher: North Holland
+Materials Research-Ibero-American Journal of Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: 1516-1439
+  publishingInfo:
+    place: Laboratoria de Materiais Vitreos, Caixa Postal 676, Sao Carlos,   13565-905SP,
+      Brazil
+    publisher: Univ Fed Sao Carlos, Dept Engenharia Materials
+Materials Science & Engineering A:
+  alternativeTitles:
+  - value: Mater. Sci. Eng. A
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materials Science Engineering A:
+  alternativeTitles:
+  - value: Mater. Sc. Engin. A
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materials Science Forum:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Sci. Forum
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928550320
+    ISSN: 0255-5476
+  publishingInfo: null
+Materials Science Forum, Proceedings of the 14th International Conference on Textures of Materials ICOTOM 14:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 087849975X
+    ISSN: 0255-5476
+  publishingInfo:
+    place: Switzerland
+    publisher: Trans Tech Publications
+Materials Science and Engineering:
+  alternativeTitles:
+  - value: Mater. Sci. Eng.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materials Science and Engineering A:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+'Materials Science and Engineering A: Structural Materials Properties Microstructure and Processing':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: 'Mater. Sci. Eng. A: Struct. Mater. Prop. Microstruct. Process.'
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928498465_1
+    ISSN: 0921-5093
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+'Materials Science and Engineering: A':
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Materials Science and Technology:
+  alternativeTitles:
+  - type: OTHER
+    value: Mater. Sci. Technol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928563505
+    ISSN: 0267-0836
+  publishingInfo: null
+Materials Theory:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2509-8012
+    ISSN: 2509-8012
+  publishingInfo:
+    publisher: SpringerOpen
+Materials Today:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Today
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1369-7021
+    ISSN: 1369-7021
+  publishingInfo:
+    place: Amsterdam, Netherlands
+    publisher: Elsevier Science
+Materials Today Communications:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Today Commun.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2352-4928
+    ISSN: 2352-4928
+  publishingInfo:
+    place: Amsterdam [u.a.]
+    publisher: 'Elsevier '
+Materials Today Physics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Today Phys.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2542-5293
+    ISSN: 2542-5293
+  publishingInfo:
+    place: Amsterdam, The Netherlands
+    publisher: Elsevier
+Materials and Corrosion - Werkstoffe und Korrosion:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Corros.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925573928
+    ISSN: 0947-5117
+  publishingInfo:
+    place: Malden, MA, USA
+    publisher: Wiley-Blackwell
+Materials and Design:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Mater. Des.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926234428
+    ISSN: 0264-1275
+  publishingInfo:
+    place: Reigate, Surrey, Eng.
+    publisher: Elsevier
+'Materials, Special Issue "Micromechanics: Experiment, Modeling and Theory"':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Materials
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1996-1944
+    ISSN: 1996-1944
+  publishingInfo: null
+Materialwissenschaft und Werkstofftechnik:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Meccanica:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Meccanica
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0025-6455
+    ISSN: 0025-6455
+  publishingInfo:
+    place: The Netherlands
+    publisher: Springer Netherlands
+Mechanics of Materials:
+  alternativeTitles:
+  - type: OTHER
+    value: Mech. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925483664
+    ISSN: 0167-6636
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Mechanics of Nanomaterials and Nanotechnology:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Sofia, Bulgaria
+    publisher: Institute of Mechanics - BAS, Sofia
+Mechanics of Time-Dependent Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Metal forming:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: '3937057080'
+    ISSN: 1611-4442
+  publishingInfo:
+    place: Bad Harzburg, Germany
+    publisher: Steel Grips
+Metallography, Microstructure, and Analysis:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Metallogr. Microstruct. Anal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2192-9270
+    ISSN: 2192-9270
+  publishingInfo:
+    place: USA
+    publisher: Springer Science + Business Media
+"Metallurgica Anatolica: Festschrift f\xFCr \xDCnsal Yal\xE7\u0131n anl\xE4sslich seines 65. Geburtstags":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978-605-7673-32-9
+  publishingInfo:
+    place: Istanbul
+    publisher: "Ege Yay\u0131nlar\u0131"
+'Metallurgical and Materials Transactions ':
+  alternativeTitles:
+  - type: OTHER
+    value: Metallurgical and Materials Transactions A, Physical Metallurgy and Materials
+      Science
+  - type: ABBREVIATION
+    value: Metall. Mater. Trans. A-Phys. Metall. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928569608
+    ISSN: 1073-5623
+  publishingInfo:
+    place: New York, NY
+    publisher: Springer Sciences & Business Media
+Metallurgical and Materials Transactions A:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Metall. Mater. Trans. A - Phys. Metall. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928569608
+    ISSN: 1073-5623
+  publishingInfo:
+    place: New York, NY
+    publisher: Springer Sciences & Business Media
+? "Metallurgical and Materials Transactions A\r\n"
+: alternativeTitles:
+  - type: ABBREVIATION
+    value: Metall. Mater. Trans. A - Phys. Metall. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928569608
+    ISSN: 1073-5623
+  publishingInfo:
+    place: New York, NY
+    publisher: Springer Sciences & Business Media
+Metallurgical and Materials Transactions a-Physical Metallurgy and Materials Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Metall. Mater. Trans. A-Phys. Metall. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928569608
+    ISSN: 1073-5623
+  publishingInfo: null
+Metals:
+  alternativeTitles:
+  - type: OTHER
+    value: Metals
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/metals
+    ISSN: 2075-4701
+  publishingInfo: null
+Metals and Materials International:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/15989623
+    ISSN: '15989623'
+  publishingInfo: null
+Micron:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Microscopy & Microanalysis:
+  alternativeTitles:
+  - value: Microsc. Microanal.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Microscopy & Microanalysis 2017:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    DOI: 10.1017/S1431927617004196
+  publishingInfo:
+    place: Cambridge, UK
+    publisher: Cambridge University Press
+Microscopy Research and Technique:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Microsc. Res. Tech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954927686720
+    ISSN: 1059-910X
+  publishingInfo:
+    place: New York, NY
+    publisher: Wiley-Liss
+Microscopy Today:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Microscopy and Microanalysis:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Microsc. Microanal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042731793414
+    ISSN: 1431-9276
+  publishingInfo:
+    place: New York, NY
+    publisher: Cambridge University Press
+? "Microscopy and Microanalysis\r\n"
+: alternativeTitles:
+  - type: ABBREVIATION
+    value: Microsc. Microanal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042731793414
+    ISSN: 1431-9276
+  publishingInfo: null
+'Microscopy and Microanalysis ':
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Microscopy and Microanalysis, ozad120:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Microsc. Microanal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042731793414
+    ISSN: 1431-9276
+  publishingInfo:
+    place: New York, NY
+    publisher: Cambridge University Press
+Microscopy and Microanalysis; First View:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Microsc. Microanal.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042731793414
+    ISSN: 1431-9276
+  publishingInfo: null
+MicroscopyMicroanalysis:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Microstructural Design of Advanced Engineering Materials:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: '9783527652815'
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: Wiley-VCH Verlag GmbH & Co. KGaA
+'Mineral reaction kinetics:  microstructures, textures, chemical and isotopic signatures, Volume in EMU Notes in Mineralogy':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    edition: '3'
+    place: UK
+    publisher: 2017 the European Mineralogical Union and the Mineralogical Society
+      of Great Britain & Ireland
+Minerals, Metals and Materials Series:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: '23671181'
+  publishingInfo:
+    publisher: Springer Science and Business Media Deutschland GmbH
+Modeling and Simulation in Materials Science and Engineering:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Modeling and Simulations in Materials Science and Engineering:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Modelling Modelling and Simulation in Materials Science and Engineering:
+  alternativeTitles:
+  - value: Modelling Simul. Mater. Sci. Eng.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Modelling and Simulation in Materials Science and Engineering:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Modelling Simul. Mater. Sci. Eng.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925581155
+    ISSN: 0965-0393
+  publishingInfo:
+    place: London
+    publisher: IOP Pub.
+Molecular Simulation:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Murat Nehri K\u0131y\u0131s\u0131nda Bir Urartu Yerle\u015Fimi: Murat Tepe":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISSN: '9786057673916 '
+  publishingInfo:
+    place: Istanbul, Turkey
+    publisher: Ege Publications
+NACE - International Corrosion Conference Series:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Nano Convergence:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nano Converg.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2196-5404
+    ISSN: 2196-5404
+  publishingInfo:
+    place: Korea
+    publisher: Korea Nano Technology Research Society
+Nano Energy:
+  alternativeTitles:
+  - type: OTHER
+    value: Nano Energy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2211-2855
+    ISSN: 2211-2855
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Nano Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nano Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978984570403
+    ISSN: 1530-6984
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+Nano Research:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nano Res.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1998-0124
+    ISSN: 1998-0124
+  publishingInfo: null
+Nanomaterials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nanomater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2079-4991
+    ISSN: 2079-4991
+  publishingInfo: null
+Nanoscale:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nanoscale
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2040-3364
+    ISSN: 2040-3364
+  publishingInfo:
+    place: Cambridge, UK
+    publisher: Royal Society of Chemistry
+Nature:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nature
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925427238
+    ISSN: 0028-0836
+  publishingInfo:
+    place: London
+    publisher: Nature Publishing Group
+Nature Catalysis:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/25201158
+    ISSN: '25201158'
+  publishingInfo:
+    publisher: Nature Publishing Group
+Nature Communications:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nat. Commun.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2041-1723
+    ISSN: 2041-1723
+  publishingInfo:
+    place: London
+    publisher: Nature Publishing Group
+Nature Computational Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nat Comput Sci
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2662-8457
+    ISSN: 2662-8457
+  publishingInfo:
+    place: London, UK
+    publisher: Nature Research
+Nature Genetics:
+  alternativeTitles:
+  - type: OTHER
+    value: Nature Genet.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925598609
+    ISSN: 1061-4036
+  publishingInfo:
+    place: New York, NY
+    publisher: Nature America, Inc.
+Nature Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nat. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111054835734000
+    ISSN: 1476-1122
+  publishingInfo: null
+Nature Reviews Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nat. Rev. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2058-8437
+    ISSN: 2058-8437
+  publishingInfo:
+    place: London, England
+    publisher: Nature Publishing Group
+'Nature reviews: Methods primers':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nat. Rev. Methods Primers
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2662-8449
+    ISSN: 2662-8449
+  publishingInfo:
+    place: London
+    publisher: 'Nature Research '
+New Journal of Physics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: New J. Phys.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926913666
+    ISSN: 1367-2630
+  publishingInfo:
+    place: Bristol
+    publisher: IOP Publishing
+Nondestructive Testing and Evaluation:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Nuclear Fusion:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nucl. Fusion
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042749627140
+    ISSN: 0029-5515
+  publishingInfo:
+    place: Bristol; Vienna
+    publisher: IOP Publishing; IAEA
+Nuclear Materials and Energy:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Nucl. Mater. Energy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2352-1791
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+Open Research Europe:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2732-5121
+    ISSN: 2732-5121
+  publishingInfo:
+    place: London, UK
+    publisher: European Commission
+Optics InfoBase Conference Papers:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+PLASTICITY 2002:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Fulton, MD, USA
+    publisher: NEAT PRESS
+PLoS One:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: PLoS One
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1000000000277850
+    ISSN: 1932-6203
+  publishingInfo:
+    place: San Francisco, CA
+    publisher: Public Library of Science
+PTM 2015 - Proceedings of the International Conference on Solid-Solid Phase Transformations in Inorganic Materials 2015:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Whistler, British Columbia
+    publisher: 'PTM 2015 '
+Palaeogeography, Palaeoclimatology, Palaeoecology:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Patterns:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2666-3899
+    ISSN: 2666-3899
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Phase transformations in steels:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978 1 84569 971 0
+  publishingInfo:
+    place: UK
+    publisher: Woodhead Publishing
+Philosophical Magazine:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Philos. Mag.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925265237
+    ISSN: 1478-6435
+  publishingInfo: null
+Philosophical Magazine A:
+  alternativeTitles:
+  - value: Philos.Mag.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Philosophical Magazine Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Philos. Mag. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925271392
+    ISSN: 0950-0839
+  publishingInfo:
+    place: London
+    publisher: Taylor and Francis
+Philosophical Transactions of the Royal Society A:
+  alternativeTitles:
+  - value: Phil. Trans. R. Soc. A
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Philosopical Magazine A:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111082135169000
+    ISSN: 0141-8610
+  publishingInfo: null
+Photovoltaic Specialist Conference (PVSC):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Physica Status Solidi:
+  alternativeTitles:
+  - value: Phys. Stat. Sol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physica Status Solidi (B):
+  alternativeTitles:
+  - value: Phys. Stat. Sol. (B)
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physica Status Solidi A-Applications and Materials Science:
+  alternativeTitles:
+  - value: Phys. Status Solidi A
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physica Status Solidi B:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Stat. Sol. B
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/958480240330
+    ISSN: 0370-1972
+  publishingInfo:
+    place: Weinheim
+    publisher: Wiley-VCH
+Physical Mesomechanics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978984564979
+    ISSN: 1029-9599
+  publishingInfo: null
+'Physical Metallurgy: Fifth Edition':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: New York, NY, USA
+    publisher: Elsevier Inc.
+Physical Review Applied:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Rev. Appl.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2331-7019
+    ISSN: 2331-7019
+  publishingInfo: null
+Physical Review B:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Rev. B
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925225008
+    ISSN: 1098-0121
+  publishingInfo:
+    place: Woodbury, NY
+    publisher: American Physical Society
+Physical Review E:
+  alternativeTitles:
+  - type: OTHER
+    value: Phys. Rev. E
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925225012
+    ISSN: 1539-3755
+  publishingInfo:
+    place: Melville, NY
+    publisher: American Physical Society
+Physical Review E - Statistical, Nonlinear, and Soft Matter Physics:
+  alternativeTitles:
+  - type: OTHER
+    value: Phys. Rev. E
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925225012
+    ISSN: 1539-3755
+  publishingInfo:
+    place: Melville, NY
+    publisher: American Physical Society
+Physical Review E 82:
+  alternativeTitles:
+  - value: Phys. Rev. E 82
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physical Review Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Rev. Lett.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physical Review Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Rev. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2475-9953
+    ISSN: 2475-9953
+  publishingInfo:
+    place: College Park, MD
+    publisher: American Physical Society
+Physics and Chemistry of Minerals:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Phys. Chem. Miner.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925519637
+    ISSN: 0342-1791
+  publishingInfo: null
+Physics of Fluids:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Physics of fluids:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928595037_1
+    ISSN: 0031-9171
+  publishingInfo:
+    place: Woodbury, N.Y. [etc.]
+    publisher: American Institute of Physics
+Polymer:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Polymer Composites:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Polymer Testing:
+  alternativeTitles:
+  - value: Polym. Test.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Powder Technology:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Powder Technol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925435450
+    ISSN: 0032-5910
+  publishingInfo:
+    place: Lausanne [etc.]
+    publisher: Elsevier
+'Praktische Metallographie/Practical Metallography ':
+  alternativeTitles:
+  - type: OTHER
+    value: Prakt. Metallogr.-PR M
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0032-678X
+    ISSN: 0032-678X
+  publishingInfo: null
+Proc. 11th Int. Conf. on Sheet Metal:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Proc. 1st Int. Conf. on Advanced Structural Steels (ICASS 2002):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Tsukuba, Japan
+    publisher: NIMS
+Proc. 3rd European Rolling Conf. (METEC Congress 03):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proc. 6th Int. ESAFORM Conf. on Material Forming:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISSN: '8876762116'
+  publishingInfo: null
+Proc. 8<sup>th</sup> Int. Conf. on Aluminium Alloys:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+Proc. 8th ICTP (CD-ROM):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proc. 8th Int. Rolling Conference:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Orlando, FL, USA
+    publisher: Iron and Steel Society
+Proc. 9th Int. Conf. Magnesium Alloys and their Applications:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-615-67510-7
+  publishingInfo: null
+Proc. Discussion Meeting on the Development of Innovative Iron Aluminium Alloys FEAL 2011:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proc. ICOTOM 13:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+Proc. Int. Deep Drawing Research Group (IDDRG) Conf.:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Bled, Slowenia
+    publisher: Publisher
+Proc. Of the 27th International SAMPE Europe conference:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proc. XXI Verformungskundliches Kolloquium:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 3-902078-02-2
+  publishingInfo:
+    place: Leoben, Austria
+    publisher: "Selbstverlag Montanuniversit\xE4t Leoben"
+Proc. XXI. Verformungskundliches Kolloquium:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 3-902078-02-2
+  publishingInfo:
+    place: Leoben, Austria
+    publisher: "Selbstverlag Montanuniversit\xE4t Leoben"
+Procedia CIRP:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Procedia Engineering:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1877-7058
+    ISSN: 1877-7058
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier BV
+Procedia Structural Integrity:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Procedia Struct. Integr.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2452-3216
+    ISSN: 2452-3216
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B.V.
+Proceeding in Applied Mathematics and Mechanics PAMM:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings Book  2nd Inter. Symp. Steel Science ISSS 2009:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-4-930980-74-8 C3057
+  publishingInfo:
+    place: Japan
+    publisher: The Iron and Steel Institute of Japan
+Proceedings Discussion Meeting on the Development of Innovative Iron Aluminium Alloys:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings ICSMA-13:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of Applied Mathematics and Mechanics:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: PAMM
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111026743049002
+    ISSN: 1617-7061
+  publishingInfo:
+    place: Weinheim, Fed. Rep. of Germany
+    publisher: Wiley-VCH Verlag
+Proceedings of Applied Mathematics and Mechanics (Special Issue):
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: PAMM
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111026743049002
+    ISSN: 1617-7061
+  publishingInfo:
+    place: Weinheim, Fed. Rep. of Germany
+    publisher: Wiley-VCH Verlag
+'Proceedings of Applied Mathematics and Mechanics (Special Issue) ':
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+? "Proceedings of Applied Mathematics and Mechanics,\r\nSpecial Issue: 90th Annual\
+  \ Meeting of the International Association of Applied Mathematics and Mechanics\
+  \ (GAMM)"
+: alternativeTitles:
+  - type: OTHER
+    value: PAMM
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/111026743049002
+    ISSN: 1617-7061
+  publishingInfo: null
+Proceedings of ICOTOM 14:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Switzerland\\par
+    publisher: Materials Science Forum
+Proceedings of International Symposium on Plastic Deformation and Texture Analysis:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of M&M 2012:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    publisher: Microscopy Society of America
+Proceedings of MMM 2008 "Computational Modeling of biological and soft condensed matter systems":
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-0-615-24781-6
+  publishingInfo:
+    place: USA
+    publisher: Dep. of Scientific Computing, Florida State University
+Proceedings of MMM Third International Conference Multiscale Materials Modeling:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: '3816772064'
+  publishingInfo:
+    place: Germany
+    publisher: Fraunhofer IRB Verlag
+Proceedings of Microscopy & Microanaalysis 2017:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: New York, NY, USA
+    publisher: 'Cambridge University Press '
+Proceedings of Microscopy & Microanalysis 2017:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of the 18th International Symposium on Plasticity & Its Current Applications:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of the 2004- Materials-Testing Conference of DGM in Neu-Ulm:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    publisher: DGM-Verlag
+Proceedings of the 2nd International Conference on Super-High Strength Steels SHSS:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of the 2nd International Conference on Texture and Anisotropy of Polycrystals (ITAP2):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+? 'Proceedings of the 5th International Symposium on Steel Science (ISSS 2017)
+
+  '
+: alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Kyoto, Japan
+    publisher: Iron and Steel Institute of Japan
+? Proceedings of the 6th European Conference on Computational Mechanics (ECCM6) and
+  7th European Conference on Computational Fluid Dynamics (ECFD7)
+: alternativeTitles:
+  - value: Proc. ECCM6 & ECFD7
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of the 9th Intern. Conference on Magnesium alloys and their applications:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Proceedings of the Biennial International Pipeline Conference, IPC:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISBN: 978-0-7918-5188-3
+  publishingInfo: null
+'Proceedings of the International Conference on Solid-Solid Phase Transformations in Inorganic Materials 2015 ':
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Whistler, BC, Canada
+    publisher: International Conference on Solid-Solid Phase Transformations in Inorganic
+      Materials 2015
+Proceedings of the International Symposium on Superalloys:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Pittsburgh, PA, USA
+    publisher: Minerals, Metals and Materials Society
+Proceedings of the National Academy of Sciences of the United States of America:
+  alternativeTitles:
+  - type: OTHER
+    value: PNAS
+  - type: OTHER
+    value: Proceedings of the National Academy of Sciences of the USA
+  - type: ABBREVIATION
+    value: Proc. Natl. Acad. Sci. U. S. A.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925427230
+    ISSN: 0027-8424
+  publishingInfo: null
+'Proceedings of the Royal Society A: Mathematical, Physical and Engineering Sciences':
+  alternativeTitles:
+  - type: OTHER
+    value: Proc. R. Soc. A
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928604112_2
+    ISSN: 1364-5021
+  publishingInfo:
+    place: London
+    publisher: Royal Society of London
+'Proceedings on the 1st International conference: Super high strength steels':
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 88-85298-56-7
+  publishingInfo:
+    place: Milano, Italy
+    publisher: Associazione Italiana di Metallurgia
+Progress in Materials Science:
+  alternativeTitles:
+  - type: OTHER
+    value: Prog. Mater. Sci.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925460086
+    ISSN: 0079-6425
+  publishingInfo:
+    publisher: Pergamon
+'Progress in Photovoltaics: Research and Applications':
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: 'Prog. Photovoltaics: Res. Appl.'
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925598626
+    ISSN: 1062-7995
+  publishingInfo:
+    place: Chichester, West Sussex, England
+    publisher: John Wiley & Sons, Ltd.
+? Prozessskalierung, Strahltechnik, Tagungsband des 2. Kolloquiums Prozessskalierung
+  im Rahmen des DFG Schwerpunktprogramms Prozessskalierung
+: alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 3-933762-17-0
+  publishingInfo:
+    place: Bremen
+    publisher: BIAS-Verlag
+RSC Advances:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: RSC Adv.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2046-2069
+    ISSN: 2046-2069
+  publishingInfo:
+    place: Cambridge, UK
+    publisher: Royal Society of Chemistry
+Recrystallization and Grain Growth:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Germany
+    publisher: Springer
+? Research and Applications in Structural Engineering, Mechanics and Computation -
+  Proceedings of the 5th International Conference on Structural Engineering, Mechanics
+  and Computation, SEMC 2013
+: alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Review of Scientific Instruments:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Revista Escola de Minas:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/03704467
+    ISSN: '03704467'
+  publishingInfo:
+    publisher: Escola de Minas
+Revista de Metalurgia:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Rolling:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+SPIE Proceedings on Fluctuation and Noise in Materials:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Schriftenreihe zur wissenschaftsbasierten Politikberatung:
+  alternativeTitles: null
+  genre: SERIES
+  identifiers: {}
+  publishingInfo: null
+Science:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Science
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/991042748276600_1
+    ISSN: 0036-8075
+  publishingInfo:
+    place: Washington, D.C.
+    publisher: American Association for the Advancement of Science
+Science Advances:
+  alternativeTitles:
+  - type: OTHER
+    value: Sci. Adv.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2375-2548
+    ISSN: 2375-2548
+  publishingInfo:
+    place: Washington
+    publisher: AAAS
+Science Bulletin:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Sci. Bull.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2095-9273
+    ISSN: 2095-9273
+  publishingInfo:
+    publisher: Elsevier B.V.
+Science China Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Sci. China Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2095-8226, 2199-4501
+    ISSN: 2095-8226, 2199-4501
+  publishingInfo:
+    publisher: Science China Press and Springer-Verlag GmbH Germany, part of Springer
+      Nature
+Science and Market , European Stainless Steel Conference:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 91-974131-9-4
+  publishingInfo:
+    place: Stockholm, Sweden
+    publisher: Jernkontoret
+Science and Technology of Advanced Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Sci. Technol. Adv. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/974392605051
+    ISSN: 1878-5514
+  publishingInfo:
+    place: Bristol
+    publisher: IoPP
+Scientific Reports:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Sci. Rep.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2045-2322
+    ISSN: 2045-2322
+  publishingInfo:
+    place: London, UK
+    publisher: Nature Publishing Group
+Scripta Materialia:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Scripta Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926243506
+    ISSN: 1359-6462
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier B. V.
+Self-healing Materials:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: 978-3-319-32778-5
+  publishingInfo:
+    place: Switzerland
+    publisher: "Springer International Publishing\r\n"
+Semiconductor Science and Technology:
+  alternativeTitles:
+  - type: OTHER
+    value: Semicond. Sci. Technol.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925500147
+    ISSN: 0268-1242
+  publishingInfo:
+    place: London?
+    publisher: IOP Pub.
+Session 1.3a, Strain Measurement at the Microscale 1:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Simulation:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Small:
+  alternativeTitles:
+  - type: OTHER
+    value: Small
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1000000000017440_1
+    ISSN: 1613-6810
+  publishingInfo: null
+Soft Matter:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Soft Matter
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1744-683X
+    ISSN: 1744-683X
+  publishingInfo:
+    place: Cambridge, UK
+    publisher: Royal Society of Chemistry
+Solar Energy:
+  alternativeTitles:
+  - type: OTHER
+    value: Solar Energy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/0038-092X
+  publishingInfo:
+    publisher: Elsevier
+Solar Energy Materials and Solar Cells:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Sol. Energy Mater Sol. Cells
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954928539160
+    ISSN: 0927-0248
+  publishingInfo:
+    place: Amsterdam
+    publisher: North-Holland
+Solid State Communications; Pergamon, New York:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: 00381098
+  publishingInfo: null
+Solid State Phenomena:
+  alternativeTitles:
+  - value: Solid State Phenom.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Solid-to-Solid Phase Transformations in Inorganic Materials 2005:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Pensylvania, USA
+    publisher: The Minerals, Metals & Materials Society
+Special Issue Materials Science and Engineering A:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Special Issue SI NOV 16 2005:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+Stahl und Eisen:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925518614
+    ISSN: 0340-4803
+  publishingInfo: null
+Steel Grips:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Steel Research:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Steel Research Int.:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Steel Research International:
+  alternativeTitles:
+  - type: OTHER
+    value: Steel Res. Int.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1611-3683
+    ISSN: 1611-3683
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: WILEY-VCH Verlag GmbH &Co. KGaA
+"Steel \u2013 Future for the Automotive Industry":
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Germany
+    publisher: Verlag Stahleisen GmbH
+Strahltechnik Volume:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo:
+    place: Bremen
+    publisher: BIAS Verlag
+? Strength, Plasticity and Fracture in Steels, Fundamentals and Novel Approaches for
+  New Demands, ISSS, 2nd International Symposium on Steel Science
+: alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 978-4-930980-74-8
+  publishingInfo:
+    place: Tokyo, Japan
+    publisher: Iron and Steel Institute of Japan (ISIJ)
+Structural Materials and Processes in Transportation:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: '9783527327874'
+  publishingInfo:
+    place: Weinheim, Germany
+    publisher: Wiley-VCH Verlag GmbH & Co. KGaA
+Super high strength steels:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: '8885298567'
+  publishingInfo:
+    place: Milan, Italy
+    publisher: Associazione Italiana di Metallurgia
+Superconducting Science and Technology:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Superconductor Science and Technology:
+  alternativeTitles:
+  - value: Supercond. Sci. Technol.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Surface and Coating Technology:
+  alternativeTitles:
+  - value: Surf. Coat. Tech.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Surface and Coatings Technology:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Surf. Coat. Tech.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925496044
+    ISSN: 0257-8972
+  publishingInfo: null
+Surface and Interface Analysis:
+  alternativeTitles:
+  - value: Surf. Interface Anal.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Symposium N \u2013 Intermetallic-Based Alloys for Structural and Functional Applications":
+  alternativeTitles: null
+  genre: SERIES
+  identifiers: {}
+  publishingInfo: null
+THERMEC'2003:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Switzerland
+    publisher: Trans Tech Publikations
+TMP, International Conference on Thermomechanical Processing of Steels:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers:
+    ISBN: 88-85298-66-4
+  publishingInfo:
+    place: Milano, Italy
+    publisher: Associazione Italiana di Metallurgia (AIM)
+TMS Letters:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Tagungsband AKIDA 2010:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISBN: ISBN 978-3-941277-08-3
+  publishingInfo: null
+"Tagungsband des EFDS Workshops \u201CMorphologie und Mikrostruktur D\xFCnner Schichten und deren Beeinflussung\u201D":
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+'Ternary Alloys: A Comprehensive Compendium of Evaluated Constitutional Data and Phase Diagrams':
+  alternativeTitles: null
+  genre: SERIES
+  identifiers: {}
+  publishingInfo: null
+Terra Nova:
+  alternativeTitles:
+  - type: OTHER
+    value: Terra Nova
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/110978979119983
+    ISSN: 0954-4879
+  publishingInfo: null
+Tetsu-To-Hagane/Journal of the Iron and Steel Institute of Japan:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Iron Steel Inst.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1006-706X
+    ISSN: '00211575'
+  publishingInfo:
+    publisher: Iron and Steel Institute of Japan
+Textures of Materials:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers: {}
+  publishingInfo: null
+"The 17\xBA CBECIMat":
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+The Joint International Conference of HSLA Steels 2005 and ISUGS 2005:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Sanya, China
+    publisher: ISUGS2005
+The Journal of Arthroplasty:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Arthroplasty
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/08835403, 15328406
+    ISSN: 08835403, 15328406
+  publishingInfo:
+    place: USA
+    publisher: Churchill Livingstone
+The Journal of Chemical Physics:
+  alternativeTitles:
+  - value: J. Chem. Phys.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+The Journal of Physical Chemistry C:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Phys. Chem. C
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954926947766
+    ISSN: 1932-7447
+  publishingInfo:
+    place: Washington, D.C.
+    publisher: American Chemical Society
+The Journal of Physical Chemistry Letters:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: J. Phys. Chem. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1948-7185
+    ISSN: 1948-7185
+  publishingInfo:
+    place: Washington, DC
+    publisher: American Chemical Society
+The Journal of Strain Analysis for Engineering Design:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+The Minerals, Metals & Materials Series:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+The Minerals, Metals & Materials Series (MMMS):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    publisher: Springer, Cham
+The Open Dentistry Journal:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Open Dent. J.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1874-2106
+    ISSN: 1874-2106
+  publishingInfo: null
+The Open Mechanics Journal:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Thermochimica Acta:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Thin Solid Films:
+  alternativeTitles:
+  - value: Thin Solid Films
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Ti-2011 Proceedings:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+Trans Tech Publications:
+  alternativeTitles: null
+  genre: ISSUE
+  identifiers:
+    ISBN: 0878494081
+  publishingInfo: null
+Transactions of Nonferrous Metals Society of China (English Edition):
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: T. Nonferr. Metal. Soc.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/958480157130
+    ISSN: 1004-0609
+  publishingInfo:
+    place: Changsha Shi
+    publisher: Zhongguo you se jin shu xue bao bian ji bu
+Transactions of the American Nuclear Society:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Trans. Am. Nucl. Soc.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+Transactions of the Indian Institute of Metals:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Trans. Indian Inst. Met.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/09722815, 09751645
+    ISSN: 09722815, 09751645
+  publishingInfo:
+    place: India
+    publisher: Springer Science + Business Media
+Tribology Letters:
+  alternativeTitles:
+  - type: OTHER
+    value: Tribol. Lett.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925586308
+    ISSN: 1023-8883
+  publishingInfo:
+    place: Bussum, Netherlands
+    publisher: Baltzer Science Publishers
+"T\xFCrkiye Bilimler Akademisi K\xFClt\xFCr Envanteri Dergisi ":
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: "T\xDCBA-KED"
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/1304-2440
+    ISSN: 1304-2440
+  publishingInfo:
+    place: Turkey
+    publisher: "T\xFCrkiye Bilimler Akademisi"
+Ultrafine Grained Materials III:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Charlotte, North Carolina, USA
+    publisher: TMS
+Ultramicroscopy:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: Ultramicroscopy
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925512451
+    ISSN: 0304-3991
+  publishingInfo:
+    place: Amsterdam
+    publisher: Elsevier
+Umformtechnik im Spannungsfeld zwischen Plastomechanik und Werkstofftechnik:
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: Bad Harzburg
+    publisher: GRIPS media 2008
+VDE Fachberichte:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    ISSN: '03404161'
+  publishingInfo:
+    publisher: VDE Verlag GmbH
+'VDE-Fachbericht 73: Kontaktverhalten und Schalten':
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo:
+    place: Berlin, Germany
+    publisher: VDE-Bezirksverein Mittelbaden e. V.; VDE Verlag
+VDFI Bericht AiF 13409 N:
+  alternativeTitles: null
+  genre: SERIES
+  identifiers: {}
+  publishingInfo: null
+WEAR:
+  alternativeTitles:
+  - type: OTHER
+    value: Wear
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925451857
+    ISSN: 0043-1648
+  publishingInfo:
+    place: Lausanne, Switzerland
+    publisher: Elsevier
+'WEEE Recycling: Research, Development, and Policies':
+  alternativeTitles: null
+  genre: BOOK
+  identifiers: {}
+  publishingInfo:
+    place: New York, NY, USA
+    publisher: Elsevier
+Water Research:
+  alternativeTitles:
+  - value: Water Res.
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+? "Weitab vom Hookeschen Gesetz -- Moderne Ans\xE4tze der Ingenieurpraxis gro\xDF\
+  er inelastischer Deformationen metallischer Werkstoffe"
+: alternativeTitles: null
+  genre: BOOK
+  identifiers:
+    ISBN: '3515087966'
+  publishingInfo:
+    place: Stuttgart, Germany
+    publisher: Franz Steiner Verlag
+XXII. Verformungskundliche Kolloquium:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+XXVII Verformungskundliches Kolloquium, Leoben 2008:
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+ZMK Zahnmedizin:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Zeitschrift f\xFCr Angewandte Mathematik und Physik":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/954925452893
+    ISSN: 0044-2275
+  publishingInfo:
+    place: 6330 Cham, Switzerland
+    publisher: Springer International Publishing
+"Zeitschrift f\xFCr Anorganische und Allgemeine Chemie":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+"Zeitschrift f\xFCr Metallkunde":
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+arXiv-Physics-Applied Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+arxiv Applied Physics:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+arxiv Condensed Matter:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+arxiv Condensed Matter Materials Science:
+  alternativeTitles: null
+  genre: JOURNAL
+  identifiers: {}
+  publishingInfo: null
+edp Sciences, MATEC Web of Conferences, Section Plenary Lecture & ECR Award Recipients:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: 'MATEC Web Conf. '
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+emc2012 proceedings (CD-ROM):
+  alternativeTitles: null
+  genre: PROCEEDINGS
+  identifiers: {}
+  publishingInfo: null
+npj Computational Materials:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: npj Comput. Mater.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2057-3960
+    ISSN: 2057-3960
+  publishingInfo: null
+npj Materials Degradation:
+  alternativeTitles:
+  - type: ABBREVIATION
+    value: npj Mater. Degrad.
+  genre: JOURNAL
+  identifiers:
+    CONE: /journals/resource/2397-2106
+    ISSN: 2397-2106
+  publishingInfo: null
+paraprobe:
+  alternativeTitles: null
+  genre: SERIES
+  identifiers:
+    OTHER: 'Project ID: 3135'
+  publishingInfo: null
