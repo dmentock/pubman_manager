@@ -92,6 +92,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
             name_col = list(col_layout.keys()).index(f'Author {i + 1}')
             helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
             affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
+            # print("HMM", i + 1, helper_col, col_num_to_col_letter(helper_col))
             row_index_cell = f'{col_num_to_col_letter(helper_col + 1)}{start_row + entry_idx + 1}'
 
             # Set data validation for names
@@ -114,23 +115,22 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
                                   'If the same affiliation appears more than once, just select any'
 
             # Add data validation for affiliations based on helper column
-            for i in range(n_authors):
-                affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
-                helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
+            affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
+            helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
 
-                # Set data validation for affiliations
-                main_sheet.data_validation(start_row + entry_idx, affiliation_col, start_row + entry_idx, affiliation_col, {
-                    'validate': 'list',
-                    'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":I" & {row_index_cell})',
-                    'input_message': affiliation_tooltip,
-                    'error_type': 'warning'
-                })
+            # Set data validation for affiliations
+            main_sheet.data_validation(start_row + entry_idx, affiliation_col, start_row + entry_idx, affiliation_col, {
+                'validate': 'list',
+                'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":I" & {row_index_cell})',
+                'input_message': affiliation_tooltip,
+                'error_type': 'warning'
+            })
 
-                # Set the tooltip based on the color
-                publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
-                if publication_color in color_messages:
-                    tooltip_message = color_messages[publication_color]
-                main_sheet.write_comment(start_row + entry_idx, affiliation_col, tooltip_message)
+            # Set the tooltip based on the color
+            publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
+            if publication_color in color_messages:
+                tooltip_message = color_messages[publication_color]
+            main_sheet.write_comment(start_row + entry_idx, affiliation_col, tooltip_message)
 
     # Add Entry Number column data
     entry_number_col = list(col_layout.keys()).index('Entry Number')

@@ -551,26 +551,32 @@ class PubManAPI:
                 })
 
             # Extracting other relevant information
-            date_created = self.safe_date_parse(str(row.get('Date created'))).strftime("%Y-%m-%d") if row.get('Date created') else None
-            date_issued = self.safe_date_parse(str(row.get('Date issued'))).strftime("%Y-%m-%d") if row.get('Date issued') else None
+            date_created_ = self.safe_date_parse(str(row.get('Date created'))) if row.get('Date created') else None
+            date_created = date_created_.strftime("%Y-%m-%d") if date_created_ else None
+            date_issued_ = self.safe_date_parse(str(row.get('Date issued'))) if row.get('Date issued') else None
+            date_issued = date_issued_.strftime("%Y-%m-%d") if date_issued_ else date_created.strftime("%Y") if date_created else None
             date_published = self.safe_date_parse(str(row.get('Date published'))).strftime("%Y-%m-%d") if row.get('Date published') else None
             identifiers = self.journals.get(row.get('Journal Title', ''), {}).get('identifiers', {})
             if 'ISSN' not in identifiers and row.get('ISSN'):
                 identifiers['ISSN'] = identifiers and row.get('ISSN')
             identifiers_list = [{'type': key, 'id': id} for key, id in
                                 identifiers.items()]
-
+            start_page, end_page, n_pages = None, None, None
+            if row.get('Page') and str(row.get('Page')) != 'nan':
+                start_page = row.get('Page').split('-')[0].strip()
+                end_page = row.get('Page').split('-')[-1].strip()
+                n_pages = int(row.get('Page').split('-')[-1].strip()) - \
+                          int(row.get('Page').split('-')[0].strip()) + 1
             sources = [{
                 'alternativeTitles': self.journals.get(row.get('Journal Title', ''), {}).get('alternativeTitles', []),
                 "genre": self.journals.get(row.get('Journal Title', ''), {}).get('genre', 'JOURNAL'),
                 "title": row.get('Journal Title'),
                 "publishingInfo":  self.journals.get(row.get('Journal Title', ''), {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
-                "volume": row.get('Volume'),
-                "issue": row.get('Issue'),
-                "startPage": row.get('Page').split('-')[0].strip() if row.get('Page') else None,
-                "endPage": row.get('Page').split('-')[-1].strip() if row.get('Page') else None,
-                "totalNumberOfPages":int(row.get('Page').split('-')[-1].strip()) -
-                                     int(row.get('Page').split('-')[0].strip()) + 1 if row.get('Page') else None,
+                "volume": int(row.get('Volume')),
+                "issue": int(row.get('Issue')),
+                "startPage": start_page,
+                "endPage": end_page,
+                "totalNumberOfPages": n_pages,
                 "identifiers": identifiers_list,
             }]
             # Building the request dictionary
@@ -602,14 +608,16 @@ class PubManAPI:
                         {"id": row.get('DOI'), "type": "DOI"},
                     ],
                     "languages": ["eng"],
-                    "sources": sources
+                    "sources": sources,
+                    'reviewMethod': 'PEER'
                 },
                 "files": []
             }
 
             request_list.append(({
                     "metadata.title": row.get('Title'),
-                    "metadata.sources[0].title": row.get('Journal Title')
+                    # TODO
+                    # "metadata.sources[0].title": row.get('Journal Title')
                 }, request)
             )
 
