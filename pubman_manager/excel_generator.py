@@ -40,15 +40,17 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
         'yellow': '#ffffe0',
         'orange': '#ffd8b1',
         'red': '#ff9999',
-        'purple': '#e6e6fa'
+        'purple': '#e6e6fa',
+        'pink': '#FFEEEE'
     }
 
     color_messages = {
-        'gray': 'Author or similar Affiliation not found in database -> using affiliation from publisher (err>0.2)',
-        'yellow': 'Author found in database -> using most similar affiliation to the one provided by the publisher (err<=0.2)',
-        'orange': 'Author found in database, but no affiliation provided by publisher -> guessing affiliation based on publication title',
+        'gray': 'Author or similar Affiliation not found in database -> using affiliation from publisher (err={err})',
+        'yellow': 'Author found in database -> using most similar affiliation to the one provided by the publisher (err={err})',
+        'orange': 'Author found in database, but no affiliation provided by publisher -> guessing affiliation based on publication title (err={err})',
         'red': 'Author not found in database, no affiliation provided by publisher -> guessing based on other author affiliations (needs revision)',
-        'purple': 'Generic Max Planck Affiliation was provided by publisher, but the precise group was not found in the database (needs revision)'
+        'purple': 'Generic Max Planck Affiliation was provided by publisher, but the precise group was not found in the database (err={err})',
+        'pink': 'Author or similar Affiliation not found in database -> using most likely affiliation from other authors (err={err})'
     }
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}
@@ -99,38 +101,43 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
             main_sheet.data_validation(start_row + entry_idx, name_col, start_row + entry_idx, name_col, {
                 'validate': 'list',
                 'source': f'Names!$A$2:$A${len(names) + 1}',
-                'input_message': 'Write the name in <first_name> <last_name> format\n\n' + \
-                                  'If it is missing and you cannot find it in the "Names" sheet with ctrl+f (check for usage of . or - or middle names/abbreviations), enter it yourself and select "yes" to override data validation.',
                 'error_type': 'warning'
             })
+            author_explanation = 'Write the name in <first_name> <last_name> format\n\n' + \
+                'If it is missing and you cannot find it in the "Names" sheet with ctrl+f (check for usage of . or - or middle names/abbreviations)' + \
+                ', enter it yourself and select "yes" to override data validation.'
+            main_sheet.write_comment(start_row + entry_idx, name_col,author_explanation)
 
             # Populate helper column with row index
             main_sheet.write_formula(start_row + entry_idx, helper_col,
                                      f'MATCH({col_num_to_col_letter(name_col + 1)}{start_row + entry_idx + 1}, Names!$A$2:$A${len(names) + 1}, 0) + 1')
 
             # Set data validation for affiliations
-            affiliation_tooltip = 'Select Affiliation from the list\n\n' + \
-                                  'If not available, enter it yourself and override data validation.\n' + \
-                                  'If there are multiple affiliations, add the same author multiple times.\n' + \
-                                  'If the same affiliation appears more than once, just select any'
+
 
             # Add data validation for affiliations based on helper column
             affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
             helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
 
-            # Set data validation for affiliations
+            publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
+            compare_error = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
+            print("publication_color,",publication_color)
+            if publication_color in color_messages:
+                print("compare_errorcompare_error",compare_error)
+                affiliation_tooltip = color_messages[publication_color].format(err=compare_error)
+            else:
+                affiliation_tooltip = ''
             main_sheet.data_validation(start_row + entry_idx, affiliation_col, start_row + entry_idx, affiliation_col, {
                 'validate': 'list',
                 'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":I" & {row_index_cell})',
                 'input_message': affiliation_tooltip,
                 'error_type': 'warning'
             })
-
-            # Set the tooltip based on the color
-            publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
-            if publication_color in color_messages:
-                tooltip_message = color_messages[publication_color]
-            main_sheet.write_comment(start_row + entry_idx, affiliation_col, tooltip_message)
+            affiliation_explanation = 'Select Affiliation from the list\n\n' + \
+                                  'If not available, enter it yourself and override data validation.\n' + \
+                                  'If there are multiple affiliations, add the same author multiple times.\n' + \
+                                  'If the same affiliation appears more than once, just select any'
+            main_sheet.write_comment(start_row + entry_idx, affiliation_col, affiliation_explanation)
 
     # Add Entry Number column data
     entry_number_col = list(col_layout.keys()).index('Entry Number')

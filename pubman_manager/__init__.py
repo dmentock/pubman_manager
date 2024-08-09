@@ -1,2 +1,18 @@
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).parent.parent
+PUBMAN_CACHE_DIR = PROJECT_ROOT / 'pubman_cache'
+PUBMAN_CACHE_DIR.mkdir(exist_ok=True)
+FILES_DIR = PROJECT_ROOT / 'files'
+FILES_DIR.mkdir(exist_ok=True)
+PUBLICATIONS_DOIS_DIR = PROJECT_ROOT / 'publications_dois'
+PUBLICATIONS_DOIS_DIR.mkdir(exist_ok=True)
+PUBLICATIONS_DIR = PROJECT_ROOT / 'publications'
+PUBLICATIONS_DIR.mkdir(exist_ok=True)
+TALKS_DIR = PROJECT_ROOT / 'talks'
+TALKS_DIR.mkdir(exist_ok=True)
+
 from .excel_generator import create_sheet
-from .pubman_api import PubManAPI
+from .pubman_base import PubmanBase
+from .pubman_creator import PubmanCreator
+from .pubman_extractor import PubmanExtractor
+from .doi_parser import DOIParser
