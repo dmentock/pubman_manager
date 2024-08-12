@@ -8,6 +8,7 @@ from datetime import datetime
 import yaml
 from pathlib import Path
 import requests
+import json
 
 class PubmanCreator(PubmanBase):
     def __init__(self, username, password, base_url = "https://pure.mpg.de/rest"):
@@ -156,9 +157,67 @@ class PubmanCreator(PubmanBase):
         if create_items:
             self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
 
+    def fetch_sample_documents(self, size=5):
+        """Fetch a small sample of documents to explore the structure."""
+        search_url = f"{self.base_url}/items/search"
+
+        query = {
+            "query": {
+                "match_all": {}  # This will fetch all documents
+            },
+            "size": size  # Fetch only a few documents
+        }
+
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(search_url, headers=headers, json=query)
+
+        if response.status_code == 200:
+            results = response.json().get('records', [])
+            for result in results:
+                print(json.dumps(result, indent=2))  # Pretty-print the JSON structure
+        else:
+            raise Exception(f"Failed to fetch sample documents: {response.status_code} {response.text}")
+    def fetch_sample_document(self):
+        search_url = f"{self.base_url}/items/search"
+
+        query = {
+            "query": {
+                "match_all": {}
+            },
+            "size": 1  # Fetch a single document
+        }
+
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(search_url, headers=headers, json=query)
+
+        if response.status_code == 200:
+            document = response.json().get('records', [])[0]  # Fetch the first document
+            print(json.dumps(document, indent=2))  # Pretty-print the document for inspection
+            return document
+        else:
+            raise Exception(f"Failed to fetch sample document: {response.status_code} {response.text}")
+
     def upload_pdf(self, pdf_path):
+        """Upload the PDF if it doesn't already exist in the repository."""
         pdf_path = Path(pdf_path)
-        staging_url = f"{self.base_url}/staging/{pdf_path.stem}{pdf_path.suffix}"
+        file_title = pdf_path.name
+
+        # Check if the file with the same title already exists
+        # existing_file_id = self.search_file_by_title(file_title)
+        # if existing_file_id:
+        #     print(f"File with title '{file_title}' already exists. Returning existing file ID: {existing_file_id}")
+        #     return existing_file_id
+
+        # If the file does not exist, upload it
+        staging_url = f"{self.base_url}/staging/{pdf_path.name}"
 
         headers = {
             "Authorization": self.auth_token,
@@ -166,8 +225,11 @@ class PubmanCreator(PubmanBase):
 
         with open(pdf_path, 'rb') as file_data:
             response = requests.post(staging_url, headers=headers, files={"data": file_data})
-        if response.status_code == 200:
-            return response.json()['objectId']  # This will return the file ID
+
+        if response.status_code in [200, 201]:
+            file_id = response.json()
+            print(f"File uploaded successfully. File ID: {file_id}")
+            return file_id
         else:
             raise Exception(f"Failed to upload file: {response.status_code} {response.text}")
 
@@ -234,7 +296,7 @@ class PubmanCreator(PubmanBase):
             identifiers_list = [{'type': key, 'id': id} for key, id in
                                 identifiers.items()]
             start_page, end_page, n_pages = None, None, None
-            if row.get('Page') and str(row.get('Page')) != 'nan':
+            if isinstance(row.get('Page'), str) and '-' in row.get('Page', '') and str(row.get('Page')) != 'nan':
                 start_page = row.get('Page').split('-')[0].strip()
                 end_page = row.get('Page').split('-')[-1].strip()
                 n_pages = int(row.get('Page').split('-')[-1].strip()) - \
@@ -251,21 +313,42 @@ class PubmanCreator(PubmanBase):
                 "totalNumberOfPages": n_pages,
                 "identifiers": identifiers_list,
             }]
-            file = {}
-            if (pdf_path:=Path(FILES_DIR / f'{doi}.pdf')).exists():
+            files = []
+            pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
+            print("pdf_path",pdf_path)
+            if pdf_path.exists():
                 file_id = self.upload_pdf(pdf_path)
                 file =  {
-                    "objectId": file_id,
+                    "objectId": '',
+                    "name": pdf_path.name,
+                    "lastModificationDate" : "",
+                    "creationDate" : "",
+                    "creator" : {
+                      "objectId" : ""
+                    },
+                    "pid" : "",
+                    'content': file_id,
                     "visibility": "PUBLIC",  # Set according to your needs
                     "contentCategory": "publisher-version",
-                    "storage": "INTERNAL_MANAGED",  # Assuming it's stored internally
-                    "metadata": {
-                        "title": pdf_path.stem,
-                        # "size": 123456,  # Replace with the actual size in bytes
-                        "mimeType": "application/pdf",
-                        'license': row.get('license')
-                    }
+                    "checksum" : "",
+                    "checksumAlgorithm" : "MD5",
+                    "mimeType" : "",
+                    "size" : 0,
+                    'storage': 'INTERNAL_MANAGED',
+                    "metadata" : {
+                      "title" : pdf_path.name,
+                      "contentCategory" : 'pre-print' if 'arxiv' in row.get('License url', '') else 'publisher-version',
+                      "description" : "File downloaded from scopus",
+                      "formats" : [ {
+                        "value" : "",
+                        "type" : ""
+                      } ],
+                      "size" : 0,
+                      "license" : row.get('License url', ''),
+                      'copyrightDate': str(int(row.get('License year', ''))),
+                    },
                 }
+                files.append(file)
             # Building the request dictionary
             request = {
                 "context": {
@@ -274,7 +357,7 @@ class PubmanCreator(PubmanBase):
                     "lastModificationDate": "",
                     "creationDate": "",
                     "creator": {
-                        "objectId": ""
+                        "objectId": self.user_id
                     },
                 },
                 "creator": {
@@ -298,13 +381,11 @@ class PubmanCreator(PubmanBase):
                     "sources": sources,
                     'reviewMethod': 'PEER'
                 },
-                "files": [file]
+                "files": files
             }
 
             request_list.append(({
                     "metadata.identifiers.id": doi,
-                    # TODO
-                    # "metadata.sources[0].title": row.get('Journal Title')
                 }, request)
             )
 

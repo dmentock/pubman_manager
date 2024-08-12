@@ -1,14 +1,14 @@
 import pytest
 import pandas as pd
 from unittest.mock import patch
-from pubman_manager import PubManAPI
+from pubman_manager import PubmanBase
 from pathlib import Path
 
 @pytest.fixture
 def mock_api():
-    return PubManAPI("dummy_token", "dummy_pw", base_url="http://dummy_url")
+    return PubmanBase("dummy_token", "dummy_pw", base_url="http://dummy_url")
 
-@patch.object(PubManAPI, 'create_event_publication')
+@patch.object(PubmanBase, 'create_event_publication')
 def test_process_excel_and_create_publications(mock_create_event_publication, mock_api):
     file_path = Path(__file__).parent / 'test_import.xlsx'
 

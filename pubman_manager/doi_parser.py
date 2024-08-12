@@ -305,7 +305,9 @@ class DOIParser:
         # Use the first title if the list is not empty or None
         journal_title = unidecode(container_title[0]) if container_title else None
         license_list = crossref_metadata.get('license')
-        license = license_list[0]['URL'] if license_list else None
+        license_url = license_list[0].get('URL', '') if license_list else None
+        license_year = license_list[0].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
+        page = crossref_metadata.get('page') if '-' in crossref_metadata.get('page', '') else ''
         prefill_publication = OrderedDict({
             "Title": [title, 35, ''],
             # "Type": [data.get('type'), 15, ''],
@@ -313,14 +315,15 @@ class DOIParser:
             "Publisher": [unidecode(crossref_metadata.get('publisher', None) or ''), 20, ''],
             "Issue": [crossref_metadata.get('issue', None), 10, ''],
             "Volume": [crossref_metadata.get('volume', None), 10, ''],
-            "Page": [crossref_metadata.get('page', None), 10, ''],
+            "Page": [page, 10, ''],
             "ISSN": [unidecode(crossref_metadata.get('ISSN', [None])[0] or ''), 15, ''],
             "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
             'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
             'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
             'DOI': [doi, 20, ''],
-            'license': [license, 20, ''],
-            'link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
+            'License url': [license_url, 20, ''],
+            'License year': [license_year, 15, ''],
+            'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
         })
 
         if scopus_metadata:
