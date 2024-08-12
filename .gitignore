@@ -4,3 +4,8 @@ Talks*
 *.vscode
 .env
 publications
+publications_dois
+pubman_cache
+Publication Templates
+files
+*geckodriver.exe
