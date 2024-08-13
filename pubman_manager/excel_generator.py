@@ -2,7 +2,7 @@ import pandas as pd
 import xlsxwriter
 from collections import OrderedDict
 from pathlib import Path
-import yaml
+from openpyxl.styles import Protection
 
 def create_sheet(file_path, names_affiliations, column_details, n_authors, prefill_publications=None, n_entries=None):
     # Ensure at least one of prefill_publications or n_entries is provided
@@ -31,9 +31,9 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
     names_sheet = workbook.add_worksheet("Names")
 
     # Create formats for the headers, italic text, and wrapped text
-    header_format = workbook.add_format({'text_wrap': True, 'bold': True, 'align': 'center', 'valign': 'vcenter'})
-    italic_format = workbook.add_format({'italic': True, 'text_wrap': True})
-    wrap_format = workbook.add_format({'text_wrap': True})
+    header_format = workbook.add_format({'text_wrap': True, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'locked': True})
+    italic_format = workbook.add_format({'italic': True, 'text_wrap': True, 'locked': True})
+    wrap_format = workbook.add_format({'text_wrap': True, 'locked': True})
 
     colors = {
         'gray': '#d3d3d3',
@@ -71,12 +71,12 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
 
     header_row = len(names)
     # Write the headers
-    for col_index, (header, (width, tooltip)) in enumerate(col_layout.items()):
+    for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
         main_sheet.write(header_row, col_index, header, header_format)
         main_sheet.write(header_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
         main_sheet.set_column(col_index, col_index, width)
 
-    start_row = header_row + 2
+    start_row = header_row + 1
 
     # Add headers to the names sheet
     names_sheet.write('A1', 'Names')
@@ -94,55 +94,50 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
             name_col = list(col_layout.keys()).index(f'Author {i + 1}')
             helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
             affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
-            # print("HMM", i + 1, helper_col, col_num_to_col_letter(helper_col))
             row_index_cell = f'{col_num_to_col_letter(helper_col + 1)}{start_row + entry_idx + 1}'
 
             # Set data validation for names
-            main_sheet.data_validation(start_row + entry_idx, name_col, start_row + entry_idx, name_col, {
-                'validate': 'list',
-                'source': f'Names!$A$2:$A${len(names) + 1}',
-                'error_type': 'warning'
-            })
             author_explanation = 'Write the name in <first_name> <last_name> format\n\n' + \
                 'If it is missing and you cannot find it in the "Names" sheet with ctrl+f (check for usage of . or - or middle names/abbreviations)' + \
                 ', enter it yourself and select "yes" to override data validation.'
-            main_sheet.write_comment(start_row + entry_idx, name_col,author_explanation)
+            main_sheet.data_validation(start_row + entry_idx, name_col, start_row + entry_idx, name_col, {
+                'validate': 'list',
+                'source': f'Names!$A$2:$A${len(names) + 1}',
+                'input_message': author_explanation,
+                'error_type': 'warning'
+            })
 
             # Populate helper column with row index
             main_sheet.write_formula(start_row + entry_idx, helper_col,
                                      f'MATCH({col_num_to_col_letter(name_col + 1)}{start_row + entry_idx + 1}, Names!$A$2:$A${len(names) + 1}, 0) + 1')
 
-            # Set data validation for affiliations
-
-
             # Add data validation for affiliations based on helper column
             affiliation_col = list(col_layout.keys()).index(f'Affiliation {i + 1}')
             helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
 
-            publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
-            compare_error = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
-            print("publication_color,",publication_color)
-            if publication_color in color_messages:
-                print("compare_errorcompare_error",compare_error)
-                affiliation_tooltip = color_messages[publication_color].format(err=compare_error)
-            else:
-                affiliation_tooltip = ''
-            main_sheet.data_validation(start_row + entry_idx, affiliation_col, start_row + entry_idx, affiliation_col, {
-                'validate': 'list',
-                'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":I" & {row_index_cell})',
-                'input_message': affiliation_tooltip,
-                'error_type': 'warning'
-            })
             affiliation_explanation = 'Select Affiliation from the list\n\n' + \
                                   'If not available, enter it yourself and override data validation.\n' + \
                                   'If there are multiple affiliations, add the same author multiple times.\n' + \
                                   'If the same affiliation appears more than once, just select any'
-            main_sheet.write_comment(start_row + entry_idx, affiliation_col, affiliation_explanation)
+            main_sheet.data_validation(start_row + entry_idx, affiliation_col, start_row + entry_idx, affiliation_col, {
+                'validate': 'list',
+                'source': f'=INDIRECT("Names!B" & {row_index_cell} & ":I" & {row_index_cell})',
+                'input_message': affiliation_explanation,
+                'error_type': 'warning'
+            })
+            affiliation_tooltip = ''
+            if prefill_publications:
+                publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
+                compare_error = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
+                if publication_color in color_messages:
+                    affiliation_tooltip = color_messages[publication_color].format(err=compare_error)
+                main_sheet.write_comment(start_row + entry_idx, affiliation_col, affiliation_tooltip)
 
     # Add Entry Number column data
     entry_number_col = list(col_layout.keys()).index('Entry Number')
     for entry_idx in range(n_entries):
-        main_sheet.write(start_row + entry_idx, entry_number_col, entry_idx + 1)
+        if entry_idx>0:
+            main_sheet.write(start_row + entry_idx, entry_number_col, entry_idx)
 
     # Prefill publications if provided
     if prefill_publications:
@@ -151,11 +146,23 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
                 if header in publication:
                     cell_value = publication[header][0]
                     main_sheet.write(start_row + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
-
-    # Hide the helper columns
-    # for i in range(n_authors):
-    #     helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
-    #     main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})
+    else:
+        for entry_idx in range(n_entries):
+            for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
+                if not 'Helper' in header and header not in ['Entry Number']:
+                    main_sheet.write(start_row + entry_idx, col_index, '', wrap_format)
+                if comment:
+                    main_sheet.data_validation(
+                        start_row + entry_idx, col_index, start_row + entry_idx, col_index,
+                        {
+                            'validate': 'any',
+                            'input_message': comment,
+                            'error_type': 'warning'
+                        }
+                    )
+    for i in range(n_authors):
+        helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
+        main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})
 
     workbook.close()
 

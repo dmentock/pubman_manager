@@ -202,19 +202,28 @@ class DOIParser:
             'Accept': 'application/pdf'
         }
         response = requests.get(url, headers=headers, allow_redirects=False)
+
+        print(f"Initial request status code: {response.status_code}")
+        print(f"Headers: {response.headers}")
+
         if response.status_code in [303, 307]:
             redirect_url = response.headers.get('Location')
             if redirect_url:
                 print(f"Redirecting to: {redirect_url}")
                 response = requests.get(redirect_url, headers=headers, stream=True)
+
+                print(f"After redirect status code: {response.status_code}")
+                print(f"Headers: {response.headers}")
             else:
                 print("Redirect URL not found. Cannot download PDF.")
                 return
+
         if response.status_code == 200 and 'application/pdf' in response.headers.get('Content-Type', ''):
             file_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
+            print(f"PDF successfully downloaded to: {file_path}")
             return file_path
         else:
             if response.status_code == 401:
@@ -393,18 +402,13 @@ class DOIParser:
                 engine='python',
                 on_bad_lines='skip'
             )
-            print("df.columns",df.columns)
             if 'DOI' not in df.columns:
                 df = pd.read_csv(publication_sheet, delimiter='\t', encoding='ISO-8859-1')
                 if 'DOI' not in df.columns:
                     raise RuntimeError(f"DOI col not found in the CSV file.")
 
             dfo = df['DOI'].dropna()
-            # for doi in ['10.1093/micmic/ozad067.876']:
             dois_data = self.collect_data_for_dois(list(dfo))
-            print("dois_data",dois_data)
-            import sys
-            sys.exit()
             self.write_dois_data(dois_data)
 
 
