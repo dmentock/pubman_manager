@@ -317,6 +317,7 @@ class PubmanCreator(PubmanBase):
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
             print("pdf_path",pdf_path)
             if pdf_path.exists():
+                print("PDFTHERE")
                 file_id = self.upload_pdf(pdf_path)
                 file =  {
                     "objectId": '',

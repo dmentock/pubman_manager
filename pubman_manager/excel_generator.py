@@ -1,8 +1,5 @@
-import pandas as pd
 import xlsxwriter
 from collections import OrderedDict
-from pathlib import Path
-from openpyxl.styles import Protection
 
 def create_sheet(file_path, names_affiliations, column_details, n_authors, prefill_publications=None, n_entries=None):
     # Ensure at least one of prefill_publications or n_entries is provided
@@ -11,7 +8,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
 
     # If prefill_publications is provided, use its length as n_entries
     if prefill_publications is not None:
-        n_entries = len(prefill_publications)
+        n_entries = len(prefill_publications) + 1
 
     # Define the column layout
     col_layout = OrderedDict([('Entry Number', (10, ''))])
@@ -126,9 +123,9 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
                 'error_type': 'warning'
             })
             affiliation_tooltip = ''
-            if prefill_publications:
-                publication_color = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, ''])[1]
-                compare_error = prefill_publications[entry_idx].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
+            if prefill_publications and entry_idx > 0:
+                publication_color = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', [None, None, ''])[1]
+                compare_error = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
                 if publication_color in color_messages:
                     affiliation_tooltip = color_messages[publication_color].format(err=compare_error)
                 main_sheet.write_comment(start_row + entry_idx, affiliation_col, affiliation_tooltip)
@@ -145,7 +142,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
             for col_index, header in enumerate(col_layout.keys()):
                 if header in publication:
                     cell_value = publication[header][0]
-                    main_sheet.write(start_row + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
+                    main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
     else:
         for entry_idx in range(n_entries):
             for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
@@ -160,10 +157,10 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
                             'error_type': 'warning'
                         }
                     )
+    # Hide helpers
     for i in range(n_authors):
         helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
         main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})
-
     workbook.close()
 
 # Helper function for column letter conversion

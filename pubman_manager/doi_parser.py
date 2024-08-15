@@ -57,12 +57,10 @@ class DOIParser:
                 return date_value[0]
         raise RuntimeError
 
-
     def process_name(self, names_affiliations, name):
         def normalize_name(name):
             """Normalize the name to ignore special characters and case."""
             return unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8').lower()
-        print('process_name',name)
         normalized_name = normalize_name(name)
         abbrev_parts = normalized_name.split(' ')
         initials = [part[0] for part in abbrev_parts if len(part) == 1 or '.' in part]
@@ -70,47 +68,25 @@ class DOIParser:
         surname = abbrev_parts[-1]
         best_match = None
         best_score = -1
-
-        # First, try to find an exact match of the full name without considering abbreviations
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
             if name.lower() == normalized_full_name and '.' not in name:
                 return full_name
-        print('full_name')
-
-        # Try to find an exact match of compound surname
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
             if normalized_name.replace(' ', '').replace('-', '') == normalized_full_name.replace(' ', '').replace('-', ''):
                 return full_name
-
-        # Then, try to find a full name match considering initials and surname
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
             full_name_parts = normalized_full_name.split(' ')
-
-            # Check if the surname matches (consider hyphens and spaces)
             if surname.replace(' ', '').replace('-', '') == full_name_parts[-1].replace(' ', '').replace('-', '') and \
                 (('.' in first_name and first_name[0] == full_name_parts[0][0]) or first_name==full_name_parts[0]):
-                # Calculate the match score based on initials
-
                 score = sum(any(fn.startswith(init) for fn in full_name_parts) for init in initials)
-                print("first_name",first_name)
-                print("full_name",full_name)
-                print("first_name[0] == full_name_parts[0][0]",first_name[0] == full_name_parts[0][0])
-                print("first_name==full_name_parts[0]",first_name==full_name_parts[0])
-                print("score1",score)
-                # Check if all initials and surname are present
                 if all(any(fn.startswith(init) for fn in full_name_parts) for init in initials):
                     score += len(initials)
-                print("score2",score)
-
-                # Prefer matches with more matching initials
                 if score > best_score or (score == best_score and len(full_name) > len(best_match)):
                     best_match = full_name
                     best_score = score
-        print("nonon",best_match)
-        # If no full name match is found, consider abbreviations
         if not best_match:
             for full_name in names_affiliations:
                 normalized_full_name = normalize_name(full_name)
@@ -118,18 +94,12 @@ class DOIParser:
                     best_match = full_name
                     best_score = len(abbrev_parts)
                     break
-        print("nonon2",best_match)
-
-        # Ensure the best match is not an abbreviation
         if best_match and '.' not in best_match:
             return best_match
         else:
-            # Try to find a full match excluding abbreviations
             for full_name in names_affiliations:
                 if normalize_name(full_name) == normalized_name.replace('.', ''):
                     return full_name
-        print("nonon3")
-
         return best_match if best_match else name
 
     def process_author_list(self,
@@ -139,10 +109,8 @@ class DOIParser:
         pubman_affiliations = set()
         processed_affiliations = {}
         for author, affiliations in affiliations_by_name.items():
-            print("author, affiliations", author, affiliations)
             processed_affiliations[author] = []
             for i, proposed_affiliation in enumerate(affiliations if affiliations else ['']):
-                print("proposed_affiliation", proposed_affiliation)
                 compare_error = ''
                 if self.affiliations_by_name_pubman.get(author):
                     if not proposed_affiliation.strip():
@@ -160,20 +128,16 @@ class DOIParser:
                             affiliation = proposed_affiliation.replace('  ', ', ').replace(') ', '), ')
                             color = 'gray'
                     compare_error = (100-score)/100
-                    print("WHATcompare_error",compare_error)
                 elif proposed_affiliation.strip():
                     affiliation = proposed_affiliation.replace('  ', ', ').replace(') ', '), ')
                     color = 'gray' if 'Max-Planck' not in affiliation else 'purple'
                 else:
                     continue
-                print("okeycompare_error",compare_error)
                 processed_affiliations[author].append([affiliation, color, compare_error])
                 if 'Max-Planck' not in affiliation:
                     non_mpg_affiliations[affiliation] += 1
                 if color != 'gray':
                     pubman_affiliations.add(affiliation)
-        print("yye",processed_affiliations)
-
         if non_mpg_affiliations:
             most_common_affiliation = non_mpg_affiliations.most_common(1)[0][0]
         else:
@@ -182,58 +146,25 @@ class DOIParser:
             if not affiliations:
                 print("overriding affiliation;", author, most_common_affiliation)
                 processed_affiliations[author] = [[most_common_affiliation, 'red', '']]
-            print("affiliationss",author, affiliations)
             for i, affiliation in enumerate(affiliations):
                 if affiliation[1] == 'gray':
                     similar_affiliation, score = process.extractOne(affiliation[0], pubman_affiliations)
                     if score > 90 and similar_affiliation not in affiliations:
-                        print("OVER")
                         processed_affiliations[author][i][0] = similar_affiliation
                         processed_affiliations[author][i][1] = 'pink'
                         processed_affiliations[author][i][2] = (100-score)/100
-        print("eee",processed_affiliations)
         return processed_affiliations
 
-    def download_scopus_pdf(self, doi):
-        print('DOI:', doi)
-        url = f"https://api.elsevier.com/content/article/doi/{doi}?httpAccept=application/pdf"
-        headers = {
-            'X-ELS-APIKey': self.scopus_api_key,
-            'Accept': 'application/pdf'
-        }
-        response = requests.get(url, headers=headers, allow_redirects=False)
-
-        print(f"Initial request status code: {response.status_code}")
-        print(f"Headers: {response.headers}")
-
-        if response.status_code in [303, 307]:
-            redirect_url = response.headers.get('Location')
-            if redirect_url:
-                print(f"Redirecting to: {redirect_url}")
-                response = requests.get(redirect_url, headers=headers, stream=True)
-
-                print(f"After redirect status code: {response.status_code}")
-                print(f"Headers: {response.headers}")
-            else:
-                print("Redirect URL not found. Cannot download PDF.")
-                return
-
-        if response.status_code == 200 and 'application/pdf' in response.headers.get('Content-Type', ''):
-            file_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
-            with open(file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            print(f"PDF successfully downloaded to: {file_path}")
-            return file_path
+    def download_pdf(self, pdf_link, doi):
+        response = requests.get(pdf_link, stream=True)
+        if response.status_code == 200:
+            with open(FILES_DIR / f'{doi.replace("/", "_")}.pdf', 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+            print(f"PDF found and saved for {doi}")
         else:
-            if response.status_code == 401:
-                print("Authentication Error: Check your API key and tokens.")
-            elif response.status_code == 403:
-                print("Authorization/Entitlements Error: You may not have the necessary rights.")
-            elif response.status_code == 404:
-                print("Resource Not Found: The DOI may be incorrect or unavailable.")
-            else:
-                print(f"Failed to download PDF. Status code: {response.status_code}, Message: {response.text}")
+            print(f"PDF not found for {doi}")
 
     def extract_scopus_authors_affiliations(self, scopus_metadata):
         author_affiliation_map = OrderedDict()
@@ -255,8 +186,7 @@ class DOIParser:
                 elif isinstance(organization_entries, list):
                     organization_names = [org['$'] for org in organization_entries]
                 else:
-                    print("organization_entries", type(organization_entries), organization_entries)
-                    raise
+                    raise RuntimeError("Invalid organization_entries", type(organization_entries), organization_entries)
                 department_name = affiliation_info.get('affilname', '')
                 city = affiliation_info.get('city', '')
                 postal_code = affiliation_info.get('postal-code', '')
@@ -311,7 +241,6 @@ class DOIParser:
         title = unidecode(clean_html(crossref_metadata.get('title', [None])[0]))
         container_title = crossref_metadata.get('container-title', [None])
 
-        # Use the first title if the list is not empty or None
         journal_title = unidecode(container_title[0]) if container_title else None
         license_list = crossref_metadata.get('license')
         license_url = license_list[0].get('URL', '') if license_list else None
@@ -339,15 +268,15 @@ class DOIParser:
             affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
         else:
             affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
-        print("affiliations_by_name",affiliations_by_name)
         cleaned_author_list = self.process_author_list(affiliations_by_name, title)
-        print("cleaned_author_list",cleaned_author_list)
         i = 1
         for author, affiliations in cleaned_author_list.items():
             for affiliation in affiliations:
                 prefill_publication[f"Author {i}"] = [author, None, '']
                 prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
                 i = i+1
+
+        self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
         return prefill_publication
 
     def collect_data_for_dois(self, doi_list):
@@ -406,9 +335,6 @@ class DOIParser:
                 df = pd.read_csv(publication_sheet, delimiter='\t', encoding='ISO-8859-1')
                 if 'DOI' not in df.columns:
                     raise RuntimeError(f"DOI col not found in the CSV file.")
-
             dfo = df['DOI'].dropna()
             dois_data = self.collect_data_for_dois(list(dfo))
-            self.write_dois_data(dois_data)
-
-
+            self.write_dois_data(dois_data, path)
