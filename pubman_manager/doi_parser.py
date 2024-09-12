@@ -11,6 +11,7 @@ import requests
 import unicodedata
 from typing import List, Dict, Tuple
 import os
+import html
 
 from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, PUBLICATIONS_DIR
 
@@ -61,46 +62,48 @@ class DOIParser:
         def normalize_name(name):
             """Normalize the name to ignore special characters and case."""
             return unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8').lower()
+
+        def strip_middle_names(full_name):
+            """Remove middle names or abbreviations from the full name, keeping only first and last names."""
+            name_parts = full_name.split(' ')
+            if len(name_parts) > 2:
+                return f"{name_parts[0]} {name_parts[-1]}"
+            return full_name
+
+        def strict_first_name_match(first_name, candidate_first_name):
+            """Match first names more strictly, accounting for hyphenations and abbreviations."""
+            # Ensure hyphenated first names match exactly
+            return first_name == candidate_first_name or first_name.replace('-', '') == candidate_first_name.replace('-', '')
+
         normalized_name = normalize_name(name)
         abbrev_parts = normalized_name.split(' ')
-        initials = [part[0] for part in abbrev_parts if len(part) == 1 or '.' in part]
         first_name = abbrev_parts[0]
         surname = abbrev_parts[-1]
+
         best_match = None
         best_score = -1
-        for full_name in names_affiliations:
-            normalized_full_name = normalize_name(full_name)
-            if name.lower() == normalized_full_name and '.' not in name:
-                return full_name
-        for full_name in names_affiliations:
-            normalized_full_name = normalize_name(full_name)
-            if normalized_name.replace(' ', '').replace('-', '') == normalized_full_name.replace(' ', '').replace('-', ''):
-                return full_name
+
+        # Iterate over the name affiliations to find the best match
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
             full_name_parts = normalized_full_name.split(' ')
-            if surname.replace(' ', '').replace('-', '') == full_name_parts[-1].replace(' ', '').replace('-', '') and \
-                (('.' in first_name and first_name[0] == full_name_parts[0][0]) or first_name==full_name_parts[0]):
-                score = sum(any(fn.startswith(init) for fn in full_name_parts) for init in initials)
-                if all(any(fn.startswith(init) for fn in full_name_parts) for init in initials):
-                    score += len(initials)
-                if score > best_score or (score == best_score and len(full_name) > len(best_match)):
-                    best_match = full_name
-                    best_score = score
-        if not best_match:
-            for full_name in names_affiliations:
-                normalized_full_name = normalize_name(full_name)
-                if ' '.join(abbrev_parts).replace(' ', '').replace('-', '') == normalized_full_name.replace(' ', '').replace('-', ''):
-                    best_match = full_name
-                    best_score = len(abbrev_parts)
-                    break
-        if best_match and '.' not in best_match:
-            return best_match
-        else:
-            for full_name in names_affiliations:
-                if normalize_name(full_name) == normalized_name.replace('.', ''):
-                    return full_name
-        return best_match if best_match else name
+
+            # If the surname matches and the first name (or abbreviation) matches exactly
+            if surname.replace(' ', '').replace('-', '') == full_name_parts[-1].replace(' ', '').replace('-', ''):
+                if strict_first_name_match(first_name, full_name_parts[0]):  # First name match or abbreviation
+                    score = 1  # Initial match counts for something
+                    if len(full_name_parts) == 2:  # Prefer names with exactly two parts
+                        score += 1
+
+                    if score > best_score:
+                        best_match = full_name
+                        best_score = score
+
+        # Normalize best match if found
+        if best_match:
+            return strip_middle_names(best_match)
+
+        return name
 
     def process_author_list(self,
                             affiliations_by_name: Dict[str, List[str]],
@@ -130,7 +133,7 @@ class DOIParser:
                     compare_error = (100-score)/100
                 elif proposed_affiliation.strip():
                     affiliation = proposed_affiliation.replace('  ', ', ').replace(') ', '), ')
-                    color = 'gray' if 'Max-Planck' not in affiliation else 'purple'
+                    color = 'gray' if 'Max-Planck' not in affiliation else 'red'
                 else:
                     continue
                 processed_affiliations[author].append([affiliation, color, compare_error])
@@ -156,15 +159,20 @@ class DOIParser:
         return processed_affiliations
 
     def download_pdf(self, pdf_link, doi):
-        response = requests.get(pdf_link, stream=True)
-        if response.status_code == 200:
-            with open(FILES_DIR / f'{doi.replace("/", "_")}.pdf', 'wb') as f:
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
-            print(f"PDF found and saved for {doi}")
+        print(f"Attempting to download PDF for DOI: {doi}")
+        print(f"PDF link: {pdf_link}")
+        if pdf_link is None:
+            print(f"No valid PDF link found for DOI: {doi}")
         else:
-            print(f"PDF not found for {doi}")
+            response = requests.get(pdf_link, stream=True)
+            if response.status_code == 200:
+                with open(FILES_DIR / f'{doi.replace("/", "_")}.pdf', 'wb') as f:
+                    for chunk in response.iter_content(1024):
+                        f.write(chunk)
+                return True
+            else:
+                print(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
+        return False
 
     def extract_scopus_authors_affiliations(self, scopus_metadata):
         author_affiliation_map = OrderedDict()
@@ -178,6 +186,8 @@ class DOIParser:
             affiliation_list = []
             source_text = affiliation_info.get('ce:source-text')
             if source_text:
+                if len(source_text) > 2 and source_text[0].islower() and source_text[1].isupper():
+                    source_text = source_text[1:]
                 affiliation_list.append(source_text)
             else:
                 organization_entries = affiliation_info.get('organization', [])
@@ -238,45 +248,60 @@ class DOIParser:
         def clean_html(raw_html):
             soup = BeautifulSoup(raw_html, "html.parser")
             return soup.get_text()
-        title = unidecode(clean_html(crossref_metadata.get('title', [None])[0]))
+        title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
         container_title = crossref_metadata.get('container-title', [None])
 
-        journal_title = unidecode(container_title[0]) if container_title else None
+        journal_title = html.unescape(unidecode(container_title[0])) if container_title else None
         license_list = crossref_metadata.get('license')
-        license_url = license_list[0].get('URL', '') if license_list else None
-        license_year = license_list[0].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
+        print("license_list",license_list)
+        license_url = license_list[-1].get('URL', '') if license_list else None
+        license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
         page = crossref_metadata.get('page') if '-' in crossref_metadata.get('page', '') else ''
+        article_number = crossref_metadata.get('article-number', '')
+
+        license_type = 'closed'
+        if scopus_metadata:
+            affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
+            if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
+                license_type = 'open'
+                print("hah",crossref_metadata.get('link', [{}]))
+                pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
+        else:
+            affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
+        cleaned_author_list = self.process_author_list(affiliations_by_name, title)
+
+        copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
+        if copyright:
+            copyright = copyright[0]
+
         prefill_publication = OrderedDict({
             "Title": [title, 35, ''],
             # "Type": [data.get('type'), 15, ''],
             "Journal Title": [journal_title, 25, ''],
-            "Publisher": [unidecode(crossref_metadata.get('publisher', None) or ''), 20, ''],
+            "Publisher": [html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20, ''],
             "Issue": [crossref_metadata.get('issue', None), 10, ''],
             "Volume": [crossref_metadata.get('volume', None), 10, ''],
             "Page": [page, 10, ''],
-            "ISSN": [unidecode(crossref_metadata.get('ISSN', [None])[0] or ''), 15, ''],
+            'Article Number': [article_number, 10, ''],
+            "ISSN": [html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15, ''],
             "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
-            'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
+            # 'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
             'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
             'DOI': [doi, 20, ''],
-            'License url': [license_url, 20, ''],
-            'License year': [license_year, 15, ''],
+            # 'License type': [license_type, 15, ''],
+            'License url': [license_url, 20, ''] if license_type=='open' else ['', 20, ''],
+            'License year': [license_year, 15, ''] if license_type=='open' else ['', 15, ''],
+            'Pdf found': ['' if license_type=='closed' else 'y' if pdf_found else 'n', 15, ''],
             'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
+            'Copyright': [copyright, 15, '']
         })
 
-        if scopus_metadata:
-            affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
-        else:
-            affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
-        cleaned_author_list = self.process_author_list(affiliations_by_name, title)
         i = 1
         for author, affiliations in cleaned_author_list.items():
             for affiliation in affiliations:
                 prefill_publication[f"Author {i}"] = [author, None, '']
                 prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
                 i = i+1
-
-        self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
         return prefill_publication
 
     def collect_data_for_dois(self, doi_list):
@@ -295,46 +320,53 @@ class DOIParser:
                     print('Publication not found on Crossref, skipping...')
         return dois_data
 
-    def write_dois_data(self, dois_data, path, overwrite = False):
+    def write_dois_data(self, path_in, path_out, overwrite = False):
+        print("path_out",path_out)
+        df = pd.read_csv(
+            path_in,
+            encoding='ISO-8859-1',
+            engine='python',
+            on_bad_lines='skip'
+        )
+        if 'DOI' not in df.columns:
+            df = pd.read_csv(path_in, delimiter='\t', encoding='ISO-8859-1')
+            if 'DOI' not in df.columns:
+                raise RuntimeError(f"DOI col not found in the CSV file.")
+        dfo = df['DOI'].dropna()
+        dois_data = self.collect_data_for_dois(list(dfo))
         if not dois_data:
-            empty_path = Path(os.path.abspath(path)).parent / f'{path.stem}_empty{path.suffix}'
+            empty_path = Path(os.path.abspath(path_out)).parent / f'{path_out.stem}_empty{path_out.suffix}'
             df = pd.DataFrame()
             df.to_excel(empty_path, index=False)
             print(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
+            # for key, val in dois_data[0].items():
+            #     print("key",key)
+            #     print("val", val)
+            #     print("val", [val[1], val[2]])
             column_details = OrderedDict({
                 key: [val[1], val[2]]
                 for key, val in dois_data[0].items()
                 if 'Author ' not in key and 'Affiliation ' not in key
             })
-            create_sheet(path, self.affiliations_by_name_pubman,
+            create_sheet(path_out, self.affiliations_by_name_pubman,
                         column_details, n_authors,
                         prefill_publications = dois_data)
-            print(f"Saved {path} successfully.")
+            print(f"Saved {path_out} successfully.")
 
-    def iterate_over_sheets_in_folder(self, doi_sheets_dir):
-        for publication_sheet in Path(doi_sheets_dir).iterdir():
-            path = Path(PUBLICATIONS_DIR / f'{Path(publication_sheet.stem)}.xlsx')
+
+    def iterate_over_sheets_in_folder(self, doi_sheets_dir, publications_sheets_dir):
+        for sheet_path in Path(doi_sheets_dir).iterdir():
+            path_out = Path(publications_sheets_dir / f'{Path(sheet_path.stem)}.xlsx')
+            print("path_outpath_out",path_out)
             # path = Path(f'./Publication Templates/test.xlsx')
-            empty_path = Path(PUBLICATIONS_DIR / f'{Path(publication_sheet.stem)}_empty.xlsx')
-            if path.exists():
-                print(f'Skipping "{path}" because the file already exists...')
+            empty_path = Path(publications_sheets_dir / f'{Path(sheet_path.stem)}_empty.xlsx')
+            if path_out.exists():
+                print(f'Skipping "{path_out}" because the file already exists...')
                 continue
             if empty_path.exists():
-                print(f'Skipping empty file "{path}" because the file already exists...')
+                print(f'Skipping empty file "{path_out}" because the file already exists...')
                 continue
-            print(f'Reading {publication_sheet}')
-            df = pd.read_csv(
-                publication_sheet,
-                encoding='ISO-8859-1',
-                engine='python',
-                on_bad_lines='skip'
-            )
-            if 'DOI' not in df.columns:
-                df = pd.read_csv(publication_sheet, delimiter='\t', encoding='ISO-8859-1')
-                if 'DOI' not in df.columns:
-                    raise RuntimeError(f"DOI col not found in the CSV file.")
-            dfo = df['DOI'].dropna()
-            dois_data = self.collect_data_for_dois(list(dfo))
-            self.write_dois_data(dois_data, path)
+            print(f'Reading {doi_sheets_dir}')
+            self.write_dois_data(sheet_path, path_out)
