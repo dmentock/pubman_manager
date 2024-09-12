@@ -72,8 +72,17 @@ class DOIParser:
 
         def strict_first_name_match(first_name, candidate_first_name):
             """Match first names more strictly, accounting for hyphenations and abbreviations."""
-            # Ensure hyphenated first names match exactly
             return first_name == candidate_first_name or first_name.replace('-', '') == candidate_first_name.replace('-', '')
+
+        def find_extended_match(surname, names_affiliations):
+            """Look for a version of the name with an extension in the middle that doesn't contain a '.' character."""
+            for full_name in names_affiliations:
+                normalized_full_name = normalize_name(full_name)
+                full_name_parts = normalized_full_name.split(' ')
+                # Check if the surname matches and if there is a middle name without '.' (not an abbreviation)
+                if surname == full_name_parts[-1] and len(full_name_parts) > 2 and '.' not in full_name_parts[1]:
+                    return full_name
+            return None
 
         normalized_name = normalize_name(name)
         abbrev_parts = normalized_name.split(' ')
@@ -99,9 +108,15 @@ class DOIParser:
                         best_match = full_name
                         best_score = score
 
+        # If no match found, attempt to find an extended version of the name
+        if not best_match:
+            extended_match = find_extended_match(surname, names_affiliations)
+            if extended_match:
+                return extended_match
+
         # Normalize best match if found
         if best_match:
-            return strip_middle_names(best_match)
+            return best_match
 
         return name
 
