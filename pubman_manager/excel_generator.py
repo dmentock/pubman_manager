@@ -141,8 +141,10 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
         for entry_idx, publication in enumerate(prefill_publications):
             for col_index, header in enumerate(col_layout.keys()):
                 if header in publication:
-                    cell_value = publication[header][0]
-                    main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
+                    if publication[header]:
+                        if not (cell_value := publication[header][0]):
+                            cell_value = ''
+                        main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
     else:
         for entry_idx in range(n_entries):
             for col_index, (header, (width, comment)) in enumerate(col_layout.items()):

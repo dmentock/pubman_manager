@@ -1,6 +1,6 @@
 import requests
 import json
-import yaml
+import logging
 import pandas as pd
 
 from collections import OrderedDict
@@ -10,6 +10,7 @@ from pubman_manager import PUBMAN_CACHE_DIR
 
 class PubmanBase:
     def __init__(self, username, password, base_url = "https://pure.mpg.de/rest"):
+        self.log = logging.getLogger()
         self.base_url = base_url
         self.username = username
         self.password = password
@@ -19,7 +20,7 @@ class PubmanBase:
         try:
             self.auth_token = self.login()
         except:
-            print("login failed")
+            self.log.info("login failed")
 
     def login(self):
         login_response = requests.post(
@@ -141,7 +142,7 @@ class PubmanBase:
             data=json.dumps({"lastModificationDate": last_modification_date})
         )
         if response.status_code != 200:
-            raise Exception("Failed to delete item")
+            self.log.info(f'deleting item {item_id} failed: {response.text}')
 
     def submit_item(self, item_id, last_modification_date, comment):
         headers = {

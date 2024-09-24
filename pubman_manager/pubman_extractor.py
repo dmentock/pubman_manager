@@ -2,6 +2,7 @@ from pubman_manager import PubmanBase
 import yaml
 import requests
 import json
+from fuzzywuzzy import fuzz
 
 class PubmanExtractor(PubmanBase):
     def extract_organization_mapping(self, yaml_file):
@@ -18,6 +19,24 @@ class PubmanExtractor(PubmanBase):
                         organizations[org_name] = org.get('identifierPath')
         return organizations
 
+    def process_affiliations(self, affiliation_list):
+        """
+        Returns a reduced list of affiliations, based on Levenshtein distance <= 0.15 using fuzzywuzzy.
+        """
+        reduced_affiliations = []
+        for affiliation in affiliation_list:
+            affiliation = affiliation.strip()
+            found_similar = False
+            for reduced_affiliation in reduced_affiliations:
+                ratio = fuzz.ratio(affiliation, reduced_affiliation)
+                if ratio >= 85:
+                    found_similar = True
+                    break
+
+            if not found_similar:
+                reduced_affiliations.append(affiliation.replace('\n',' ').replace('  ', ' '))
+        return reduced_affiliations
+
     def extract_authors_info(self, publications):
         authors_info = {}
         for record in publications:
@@ -29,8 +48,7 @@ class PubmanExtractor(PubmanBase):
                 family_name = person.get('familyName', '')
                 full_name = f"{given_name} {family_name}".strip()
                 organizations = person.get('organizations', [])
-                affiliation_list = [org['name'] for org in organizations]
-
+                affiliation_list = self.process_affiliations([org['name'] for org in organizations])
                 if full_name not in authors_info:
                     authors_info[full_name] = {}
                 if 'affiliations' in authors_info[full_name]:
@@ -64,7 +82,6 @@ class PubmanExtractor(PubmanBase):
         return {name: affiliations for name, affiliations in authors_info.items()
                  if not ('.' in name.split()[0] and has_full_name_equivalent(name, full_names))}
 
-
     def extract_journal_names(self, publications):
         journals = {}
         for record in publications:
@@ -80,7 +97,6 @@ class PubmanExtractor(PubmanBase):
                     }
                 break
         return journals
-
 
     def search_publications_by_organization(self, organization_id, size=50):
         query = {
@@ -151,17 +167,11 @@ class PubmanExtractor(PubmanBase):
 
         if response.status_code != 200:
             raise Exception(f"Failed to fetch organizations: {response.status_code}")
-
-        # Extracting the list of records
         results = response.json().get('records', [])
-
         organizations = {}
         for record in results:
-            # Access the 'data' key where the publication metadata is stored
             data = record.get('data', {})
             metadata = data.get('metadata', {})
-
-            # Loop through the creators to extract organization information
             for creator in metadata.get("creators", []):
                 person = creator.get("person", {})
                 for org in person.get("organizations", []):
