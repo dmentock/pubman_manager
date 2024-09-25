@@ -49,6 +49,66 @@ class DOIParser:
         self.scopus_metadata_map[doi] = response.json()
         return response.json()
 
+
+    def extract_crossref_authors_affiliations(self, crossref_metadata):
+        affiliations_by_name = OrderedDict()
+        for author in crossref_metadata.get('author', []):
+            author_name = self.process_name(self.affiliations_by_name_pubman, unidecode(author.get('given', '')) + ' ' + unidecode(author.get('family', '')))
+            affiliations_by_name[author_name] = []
+            for affiliation in author.get('affiliation', []):
+                affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
+        return affiliations_by_name
+
+    def extract_scopus_authors_affiliations(self, scopus_metadata):
+        author_affiliation_map = OrderedDict()
+        authors_list = scopus_metadata['abstracts-retrieval-response']['authors']['author']
+        author_groups = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['author-group']
+        if isinstance(author_groups, dict):
+            author_groups = [author_groups]
+        author_id_to_affiliations = {}
+        for group in author_groups:
+            affiliation_info = group.get('affiliation', {})
+            affiliation_list = []
+            source_text = affiliation_info.get('ce:source-text')
+            if source_text:
+                if len(source_text) > 2 and source_text[0].islower() and source_text[1].isupper():
+                    source_text = source_text[1:]
+                affiliation_list.append(source_text)
+            else:
+                organization_entries = affiliation_info.get('organization', [])
+                if isinstance(organization_entries, dict):
+                    organization_names = [organization_entries['$']]
+                elif isinstance(organization_entries, list):
+                    organization_names = [org['$'] for org in organization_entries]
+                else:
+                    raise RuntimeError("Invalid organization_entries", type(organization_entries), organization_entries)
+                department_name = affiliation_info.get('affilname', '')
+                city = affiliation_info.get('city', '')
+                postal_code = affiliation_info.get('postal-code', '')
+                country = affiliation_info.get('country', '')
+                if organization_names:
+                    parts = organization_names + [city, postal_code, country]
+                    full_affiliation = ', '.join(filter(None, parts))  # Remove empty parts
+                    affiliation_list.append(full_affiliation)
+                else:
+                    full_affiliation = ', '.join(filter(None, [department_name, city, postal_code, country]))
+                    affiliation_list.append(full_affiliation)
+            for author in group.get('author', []):
+                author_id = author.get('@auid', '')
+                if author_id not in author_id_to_affiliations:
+                    author_id_to_affiliations[author_id] = []
+                author_id_to_affiliations[author_id].extend(affiliation_list)
+        for author in authors_list:
+            preferred_name = author.get('preferred-name', {})
+            given_name = preferred_name.get('ce:given-name', '')
+            surname = preferred_name.get('ce:surname', '')
+            full_name = self.process_name(self.affiliations_by_name_pubman, f"{given_name} {surname}".strip())
+            author_id = author.get('@auid', '')
+            affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
+            unique_affiliations = list(OrderedDict.fromkeys(affiliations))
+            author_affiliation_map[full_name] = unique_affiliations
+        return author_affiliation_map
+
     def parse_date(self, date_value):
         if isinstance(date_value, str):
             parsed_date = parser.parse(date_value)
@@ -70,13 +130,6 @@ class DOIParser:
         def normalize_name(name):
             """Normalize the name to ignore special characters and case."""
             return unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8').lower()
-
-        def strip_middle_names(full_name):
-            """Remove middle names or abbreviations from the full name, keeping only first and last names."""
-            name_parts = full_name.split(' ')
-            if len(name_parts) > 2:
-                return f"{name_parts[0]} {name_parts[-1]}"
-            return full_name
 
         def strict_first_name_match(first_name, candidate_first_name):
             """Match first names more strictly, accounting for hyphenations and abbreviations."""
@@ -121,6 +174,14 @@ class DOIParser:
             extended_match = find_extended_match(surname, names_affiliations)
             if extended_match:
                 return extended_match
+
+        # Check for specific case of matching initials more leniently, such as L. T. Stephenson -> Leigh Stephenson
+        for full_name in names_affiliations:
+            normalized_full_name = normalize_name(full_name)
+            full_name_parts = normalized_full_name.split(' ')
+            if len(full_name_parts) == 2:  # First and last name only
+                if surname == full_name_parts[-1] and first_name[0] == full_name_parts[0][0]:
+                    return full_name
 
         # Normalize best match if found
         if best_match:
@@ -197,65 +258,6 @@ class DOIParser:
                 print(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
         return False
 
-    def extract_scopus_authors_affiliations(self, scopus_metadata):
-        author_affiliation_map = OrderedDict()
-        authors_list = scopus_metadata['abstracts-retrieval-response']['authors']['author']
-        author_groups = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['author-group']
-        if isinstance(author_groups, dict):
-            author_groups = [author_groups]
-        author_id_to_affiliations = {}
-        for group in author_groups:
-            affiliation_info = group.get('affiliation', {})
-            affiliation_list = []
-            source_text = affiliation_info.get('ce:source-text')
-            if source_text:
-                if len(source_text) > 2 and source_text[0].islower() and source_text[1].isupper():
-                    source_text = source_text[1:]
-                affiliation_list.append(source_text)
-            else:
-                organization_entries = affiliation_info.get('organization', [])
-                if isinstance(organization_entries, dict):
-                    organization_names = [organization_entries['$']]
-                elif isinstance(organization_entries, list):
-                    organization_names = [org['$'] for org in organization_entries]
-                else:
-                    raise RuntimeError("Invalid organization_entries", type(organization_entries), organization_entries)
-                department_name = affiliation_info.get('affilname', '')
-                city = affiliation_info.get('city', '')
-                postal_code = affiliation_info.get('postal-code', '')
-                country = affiliation_info.get('country', '')
-                if organization_names:
-                    parts = organization_names + [city, postal_code, country]
-                    full_affiliation = ', '.join(filter(None, parts))  # Remove empty parts
-                    affiliation_list.append(full_affiliation)
-                else:
-                    full_affiliation = ', '.join(filter(None, [department_name, city, postal_code, country]))
-                    affiliation_list.append(full_affiliation)
-            for author in group.get('author', []):
-                author_id = author.get('@auid', '')
-                if author_id not in author_id_to_affiliations:
-                    author_id_to_affiliations[author_id] = []
-                author_id_to_affiliations[author_id].extend(affiliation_list)
-        for author in authors_list:
-            preferred_name = author.get('preferred-name', {})
-            given_name = preferred_name.get('ce:given-name', '')
-            surname = preferred_name.get('ce:surname', '')
-            full_name = self.process_name(self.affiliations_by_name_pubman, f"{given_name} {surname}".strip())
-            author_id = author.get('@auid', '')
-            affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
-            unique_affiliations = list(OrderedDict.fromkeys(affiliations))
-            author_affiliation_map[full_name] = unique_affiliations
-        return author_affiliation_map
-
-    def extract_crossref_authors_affiliations(self, crossref_metadata):
-        affiliations_by_name = OrderedDict()
-        for author in crossref_metadata.get('author', []):
-            author_name = self.process_name(self.affiliations_by_name_pubman, unidecode(author.get('given', '')) + ' ' + unidecode(author.get('family', '')))
-            affiliations_by_name[author_name] = []
-            for affiliation in author.get('affiliation', []):
-                affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
-        return affiliations_by_name
-
     def get_dois_for_author(self,
                             author_name,
                             pubyear_start=None,
@@ -309,6 +311,7 @@ class DOIParser:
         dois = get_dois()
         return self.filter_dois(dois)
 
+
     def filter_dois(self, dois):
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
@@ -337,15 +340,14 @@ class DOIParser:
                 else:
                     titles.append(crossref_metadata.get('title', 'Unknown Title'))
                     publication_dates.append(crossref_metadata.get('published-online', 'Unknown Date'))
-                    main_author = crossref_metadata.get('author', {'affiliation': ['Max-Planck']})[0]
-                    has_mp_affiliation = False
-                    for affiliation in main_author['affiliation']:
-                        print("hah",unidecode(main_author.get('given', '')) + ' ' + unidecode(main_author.get('family', '')), affiliation)
-                        if 'Max-Planck' in affiliation.get('name', '') or 'Max Planck' in affiliation.get('name', ''):
-                            has_mp_affiliation = True
-                    if not has_mp_affiliation:
-                        main_author_name = unidecode(main_author.get('given', '')) + ' ' + unidecode(main_author.get('family', ''))
-                        field.append(f'Author "{main_author_name}" has no Max-Planck affiliation')
+                    author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+                    is_mp_publication = False
+                    for _, affiliations in author_affiliation_map.items():
+                        for affiliation in affiliations:
+                            if 'Max-Planck' in affiliation or 'Max Planck' in affiliation:
+                                is_mp_publication = True
+                    if not is_mp_publication:
+                        field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
 
             fields.append("\n".join(field))
         df = pd.DataFrame({
@@ -403,9 +405,9 @@ class DOIParser:
                 affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
             cleaned_author_list = self.process_author_list(affiliations_by_name, title)
 
-            copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
-            if copyright:
-                copyright = copyright[0]
+            # copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
+            # if copyright:
+            #     copyright = copyright[0]
 
             prefill_publication = OrderedDict({
                 "Title": [title, 35, ''],
@@ -426,7 +428,7 @@ class DOIParser:
                 'License year': [license_year, 15, ''] if license_type=='open' else ['', 15, ''],
                 'Pdf found': ['' if license_type=='closed' else 'y' if pdf_found else 'n', 15, ''],
                 'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
-                'Copyright': [copyright, 15, '']
+                # 'Copyright': [copyright, 15, '']
             })
 
             i = 1
@@ -436,26 +438,26 @@ class DOIParser:
                     prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
                     i = i+1
             dois_data.append(prefill_publication)
-        return pd.DataFrame(dois_data)
+        return dois_data
 
-    def write_dois_data(self, path_out, df_dois_data):
-        if df_dois_data.empty:
-            # Handle empty DataFrame case
+    def write_dois_data(self, path_out, dois_data):
+        if not dois_data:
             empty_path = Path(os.path.abspath(path_out)).parent / f'{path_out.stem}_empty{path_out.suffix}'
             df = pd.DataFrame()
             df.to_excel(empty_path, index=False)
             print(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
-
-            # Create column details based on the DataFrame columns
+            # for key, val in dois_data[0].items():
+            #     print("key",key)
+            #     print("val", val)
+            #     print("val", [val[1], val[2]])
             column_details = OrderedDict({
-                col: [df_dois_data[col].iloc[0], df_dois_data[col].iloc[1]]
-                for col in df_dois_data.columns
-                if 'Author ' not in col and 'Affiliation ' not in col
+                key: [val[1], val[2]]
+                for key, val in dois_data[0].items()
+                if 'Author ' not in key and 'Affiliation ' not in key
             })
-            dois_data = df_dois_data.to_dict('records')
             create_sheet(path_out, self.affiliations_by_name_pubman,
                         column_details, n_authors,
-                        prefill_publications=dois_data)
+                        prefill_publications = dois_data)
             print(f"Saved {path_out} successfully.")

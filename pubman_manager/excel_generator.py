@@ -1,7 +1,7 @@
 import xlsxwriter
 from collections import OrderedDict
 
-def create_sheet(file_path, names_affiliations, column_details, n_authors, prefill_publications=None, n_entries=None):
+def create_sheet(file_path, names_affiliations, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
     # Ensure at least one of prefill_publications or n_entries is provided
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided to determine the number of rows.")
@@ -31,6 +31,14 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
     header_format = workbook.add_format({'text_wrap': True, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'locked': True})
     italic_format = workbook.add_format({'italic': True, 'text_wrap': True, 'locked': True})
     wrap_format = workbook.add_format({'text_wrap': True, 'locked': True})
+
+    # Create format for disclaimer
+    disclaimer_format = workbook.add_format({
+        'bold': True,
+        'font_color': 'red',
+        'text_wrap': True,  # Ensure text wrapping for multiline messages
+        'valign': 'vcenter'  # Vertical alignment for better appearance
+    })
 
     colors = {
         'gray': '#d3d3d3',
@@ -66,14 +74,25 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
     for row_index in range(len(names)):
         main_sheet.set_row(row_index, None, None, {'hidden': True})
 
-    header_row = len(names)
-    # Write the headers
+    header_row = len(names) + 2  # Adjust header row position to leave space for the disclaimer
+
+    # Add a visible disclaimer row above the headers
+    disclaimer_lines = [
+        "Please try to avoid copy-pasting in areas with dropdowns, as this will break the underlying data validation and make subsequent editing difficult.",
+        # "Only do so if you are sure you won't have to change the author name or affiliations afterwards, e.g. when pasting from identical sections in previous entries."
+    ]
+
+    # Write the disclaimer one line per row
+    disclaimer_start_row = header_row - 2  # Adjust this to place the disclaimer two rows above the header
+    for i, line in enumerate(disclaimer_lines):
+        main_sheet.merge_range(f'A{disclaimer_start_row + i}:{col_num_to_col_letter(len(col_layout))}{disclaimer_start_row + i}',
+                              line, disclaimer_format)    # Write the headers
     for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
         main_sheet.write(header_row, col_index, header, header_format)
         main_sheet.write(header_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
         main_sheet.set_column(col_index, col_index, width)
 
-    start_row = header_row + 1
+    start_row = header_row + 2
 
     # Add headers to the names sheet
     names_sheet.write('A1', 'Names')
@@ -133,7 +152,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
     # Add Entry Number column data
     entry_number_col = list(col_layout.keys()).index('Entry Number')
     for entry_idx in range(n_entries):
-        if entry_idx>0:
+        if entry_idx > 0:
             main_sheet.write(start_row + entry_idx, entry_number_col, entry_idx)
 
     # Prefill publications if provided
@@ -144,6 +163,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
                     if publication[header]:
                         if not (cell_value := publication[header][0]):
                             cell_value = ''
+                        print("cell_value",cell_value)
                         main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
     else:
         for entry_idx in range(n_entries):

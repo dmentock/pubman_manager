@@ -16,6 +16,17 @@ PUBLICATIONS_DIR.mkdir(exist_ok=True)
 TALKS_DIR = PROJECT_ROOT / 'talks'
 TALKS_DIR.mkdir(exist_ok=True)
 
+from dotenv import load_dotenv
+import os
+
+env_path = PROJECT_ROOT / ".env"
+load_dotenv(dotenv_path=env_path)
+
+ENV_USERNAME = os.getenv("USERNAME")
+ENV_PASSWORD = os.getenv("PASSWORD")
+ENV_SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY")
+SCOPUS_AFFILIATION_ID = os.getenv("SCOPUS_AFFILIATION_ID")
+
 from .excel_generator import create_sheet
 from .pubman_base import PubmanBase
 from .pubman_creator import PubmanCreator

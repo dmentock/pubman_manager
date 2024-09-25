@@ -6,17 +6,17 @@ import pandas as pd
 from collections import OrderedDict
 from pathlib import Path
 
-from pubman_manager import PUBMAN_CACHE_DIR
+from pubman_manager import PUBMAN_CACHE_DIR, ENV_USERNAME, ENV_PASSWORD
 
 class PubmanBase:
-    def __init__(self, username, password, base_url = "https://pure.mpg.de/rest"):
+    def __init__(self, username=None, password=None, base_url = "https://pure.mpg.de/rest"):
         self.log = logging.getLogger()
         self.base_url = base_url
-        self.username = username
-        self.password = password
-        self.org_id = 'ou_1863381' # Org ID for all MPIE publications, TODO: fetch based on Institute name
-        self.user_id = "user_1944725"  # User id for user PuRe user "Mentock", TODO: fetch automatically in the future based on username
-        self.ctx_id = "ctx_2019354" # CTX ID for all MPIE publications, TODO: fetch based on org_id
+        self.username = username if username else ENV_USERNAME
+        self.password = password if password else ENV_PASSWORD
+        self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
+        self.user_id = "user_1944725"  # PuRe User id for user PuRe user "Mentock", TODO: fetch automatically in the future based on username
+        self.ctx_id = "ctx_2019354" # PuRe CTX ID for all MPIE publications, TODO: fetch based on org_id
         try:
             self.auth_token = self.login()
         except:
