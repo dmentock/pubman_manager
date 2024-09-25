@@ -12,11 +12,14 @@ import unicodedata
 from typing import List, Dict, Tuple
 import os
 import html
+import logging
 
 from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None):
+        self.log = logging.getLogger()
+        logging.basicConfig(level=logging.INFO)
         self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
@@ -34,7 +37,7 @@ class DOIParser:
             self.crossref_metadata_map[doi] = result['message']
             return result['message']
         except Exception as e:
-            print(f"Failed to retrieve data for DOI {doi}: {e}")
+            self.log.error(f"Failed to retrieve data for DOI {doi}: {e}")
 
     def get_scopus_metadata(self, doi):
         if doi in self.scopus_metadata_map:
@@ -231,7 +234,6 @@ class DOIParser:
             most_common_affiliation = ''
         for author, affiliations in processed_affiliations.items():
             if not affiliations:
-                print("overriding affiliation;", author, most_common_affiliation)
                 processed_affiliations[author] = [[most_common_affiliation, 'red', '']]
             for i, affiliation in enumerate(affiliations):
                 if affiliation[1] == 'gray':
@@ -243,10 +245,10 @@ class DOIParser:
         return processed_affiliations
 
     def download_pdf(self, pdf_link, doi):
-        print(f"Attempting to download PDF for DOI: {doi}")
-        print(f"PDF link: {pdf_link}")
+        self.log.debug(f"Attempting to download PDF for DOI: {doi}")
+        self.log.debug(f"PDF link: {pdf_link}")
         if pdf_link is None:
-            print(f"No valid PDF link found for DOI: {doi}")
+            self.log.error(f"No valid PDF link found for DOI: {doi}")
         else:
             response = requests.get(pdf_link, stream=True)
             if response.status_code == 200:
@@ -255,7 +257,7 @@ class DOIParser:
                         f.write(chunk)
                 return True
             else:
-                print(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
+                self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
         return False
 
     def get_dois_for_author(self,
@@ -305,8 +307,7 @@ class DOIParser:
                             dois.append(doi)
                     start += len(entries)
                 else:
-                    print(f"Error {response.status_code}: {response.text}")
-                    break
+                    raise RuntimeError(f"Scopus query API error {response.status_code}: {response.text}")
             return dois
         dois = get_dois()
         return self.filter_dois(dois)
@@ -370,15 +371,16 @@ class DOIParser:
         new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
         dois_data = []
         for doi in new_dois:
-            print("Processing Publication DOI", doi)
+            self.log.debug("Processing Publication DOI {doi}")
             crossref_metadata = self.get_crossref_metadata(doi)
             if not crossref_metadata:
                 return None
+            self.log.debug(f"crossref_metadata {crossref_metadata}")
             try:
                 scopus_metadata = self.get_scopus_metadata(doi)
             except requests.HTTPError:
                 scopus_metadata = None
-            print("scopus_metadata", scopus_metadata)
+            self.log.debug(f"scopus_metadata {scopus_metadata}")
 
             def clean_html(raw_html):
                 soup = BeautifulSoup(raw_html, "html.parser")
@@ -388,7 +390,6 @@ class DOIParser:
 
             journal_title = html.unescape(unidecode(container_title[0])) if container_title else None
             license_list = crossref_metadata.get('license')
-            print("license_list",license_list)
             license_url = license_list[-1].get('URL', '') if license_list else None
             license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
             page = crossref_metadata.get('page') if '-' in crossref_metadata.get('page', '') else ''
@@ -399,7 +400,6 @@ class DOIParser:
                 affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
                 if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
                     license_type = 'open'
-                    print("hah",crossref_metadata.get('link', [{}]))
                     pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
             else:
                 affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
@@ -445,13 +445,9 @@ class DOIParser:
             empty_path = Path(os.path.abspath(path_out)).parent / f'{path_out.stem}_empty{path_out.suffix}'
             df = pd.DataFrame()
             df.to_excel(empty_path, index=False)
-            print(f"Saved empty_path {empty_path} successfully.")
+            self.log.info(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
-            # for key, val in dois_data[0].items():
-            #     print("key",key)
-            #     print("val", val)
-            #     print("val", [val[1], val[2]])
             column_details = OrderedDict({
                 key: [val[1], val[2]]
                 for key, val in dois_data[0].items()
@@ -460,4 +456,4 @@ class DOIParser:
             create_sheet(path_out, self.affiliations_by_name_pubman,
                         column_details, n_authors,
                         prefill_publications = dois_data)
-            print(f"Saved {path_out} successfully.")
+            self.log.info(f"Saved {path_out} successfully.")
