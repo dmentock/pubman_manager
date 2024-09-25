@@ -13,32 +13,40 @@ from typing import List, Dict, Tuple
 import os
 import html
 
-from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, PUBLICATIONS_DIR
+from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
 class DOIParser:
-    def __init__(self, scopus_api_key, pubman_api):
-        self.scopus_api_key = scopus_api_key
+    def __init__(self, pubman_api, scopus_api_key = None):
+        self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
             authors_info = yaml.safe_load(f)
         self.affiliations_by_name_pubman = OrderedDict({key: val['affiliations'] for key, val in authors_info.items() if val})
+        self.crossref_metadata_map = {}
+        self.scopus_metadata_map = {}
 
     def get_crossref_metadata(self, doi):
+        if doi in self.crossref_metadata_map:
+            return self.crossref_metadata_map[doi]
         cr = Crossref()
         try:
             result = cr.works(ids=doi)
+            self.crossref_metadata_map[doi] = result['message']
             return result['message']
         except Exception as e:
             print(f"Failed to retrieve data for DOI {doi}: {e}")
 
-    def get_scopus_metadata(self, doi, api_key):
+    def get_scopus_metadata(self, doi):
+        if doi in self.scopus_metadata_map:
+            return self.scopus_metadata_map[doi]
         url = "https://api.elsevier.com/content/abstract/doi/"
         headers = {
             'Accept': 'application/json',
-            'X-ELS-APIKey': api_key,
+            'X-ELS-APIKey': self.scopus_api_key,
         }
         response = requests.get(url + doi, headers=headers)
         response.raise_for_status()
+        self.scopus_metadata_map[doi] = response.json()
         return response.json()
 
     def parse_date(self, date_value):
@@ -248,140 +256,206 @@ class DOIParser:
                 affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
         return affiliations_by_name
 
-    def collect_data_for_doi(self, doi):
-        print("Processing Publication DOI", doi)
-        crossref_metadata = self.get_crossref_metadata(doi)
-        print("metadata", crossref_metadata)
-        if not crossref_metadata:
-            return None
-        try:
-            scopus_metadata = self.get_scopus_metadata(doi, self.scopus_api_key)
-        except requests.HTTPError:
-            scopus_metadata = None
-        print("scopus_metadata", scopus_metadata)
+    def get_dois_for_author(self,
+                            author_name,
+                            pubyear_start=None,
+                            pubyear_end=None,
+                            extra_queries: List[str] = None):
+        BASE_URL = "https://api.elsevier.com/content/search/scopus"
 
-        def clean_html(raw_html):
-            soup = BeautifulSoup(raw_html, "html.parser")
-            return soup.get_text()
-        title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
-        container_title = crossref_metadata.get('container-title', [None])
+        query_components = [f'AF-ID({SCOPUS_AFFILIATION_ID})']
+        query_components.append(f'AUTHFIRST("{author_name.split()[0][0]}")')
+        query_components.append(f'AUTHOR-NAME("{author_name.split()[-1]}")')
+        if pubyear_start:
+            query_components.append(f'PUBYEAR > {pubyear_start - 1}')
+        if pubyear_end:
+            query_components.append(f'PUBYEAR < {pubyear_end + 1}')
+        if extra_queries:
+            for extra_query in extra_queries:
+                query_components.append(extra_query)
+        query = ' AND '.join(query_components)
+        if not query:
+            raise ValueError("At least one search parameter must be provided.")
+        headers = {
+            "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
+            "Accept": "application/json"
+        }
+        params = {
+            "query": query,
+            "field": "doi",
+            "count": 200,
+            "start": 0
+        }
+        def get_dois():
+            dois = []
+            start = 0
+            total_results = 1
+            while start < total_results:
+                params['start'] = start
+                response = requests.get(BASE_URL, headers=headers, params=params)
+                if response.status_code == 200:
+                    data = response.json()
+                    total_results = int(data['search-results']['opensearch:totalResults'])
+                    entries = data['search-results'].get('entry', [])
+                    for entry in entries:
+                        doi = entry.get('prism:doi')
+                        if doi:
+                            dois.append(doi)
+                    start += len(entries)
+                else:
+                    print(f"Error {response.status_code}: {response.text}")
+                    break
+            return dois
+        dois = get_dois()
+        return self.filter_dois(dois)
 
-        journal_title = html.unescape(unidecode(container_title[0])) if container_title else None
-        license_list = crossref_metadata.get('license')
-        print("license_list",license_list)
-        license_url = license_list[-1].get('URL', '') if license_list else None
-        license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
-        page = crossref_metadata.get('page') if '-' in crossref_metadata.get('page', '') else ''
-        article_number = crossref_metadata.get('article-number', '')
-
-        license_type = 'closed'
-        if scopus_metadata:
-            affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
-            if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
-                license_type = 'open'
-                print("hah",crossref_metadata.get('link', [{}]))
-                pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
-        else:
-            affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
-        cleaned_author_list = self.process_author_list(affiliations_by_name, title)
-
-        copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
-        if copyright:
-            copyright = copyright[0]
-
-        prefill_publication = OrderedDict({
-            "Title": [title, 35, ''],
-            # "Type": [data.get('type'), 15, ''],
-            "Journal Title": [journal_title, 25, ''],
-            "Publisher": [html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20, ''],
-            "Issue": [crossref_metadata.get('issue', None), 10, ''],
-            "Volume": [crossref_metadata.get('volume', None), 10, ''],
-            "Page": [page, 10, ''],
-            'Article Number': [article_number, 10, ''],
-            "ISSN": [html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15, ''],
-            "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
-            # 'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
-            'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
-            'DOI': [doi, 20, ''],
-            # 'License type': [license_type, 15, ''],
-            'License url': [license_url, 20, ''] if license_type=='open' else ['', 20, ''],
-            'License year': [license_year, 15, ''] if license_type=='open' else ['', 15, ''],
-            'Pdf found': ['' if license_type=='closed' else 'y' if pdf_found else 'n', 15, ''],
-            'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
-            'Copyright': [copyright, 15, '']
-        })
-
-        i = 1
-        for author, affiliations in cleaned_author_list.items():
-            for affiliation in affiliations:
-                prefill_publication[f"Author {i}"] = [author, None, '']
-                prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
-                i = i+1
-        return prefill_publication
-
-    def collect_data_for_dois(self, doi_list):
-        dois_data = []
-        for doi in doi_list:
+    def filter_dois(self, dois):
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        titles = []
+        publication_dates = []
+        fields = []
+        for doi in dois:
+            field = []
             pub = self.pubman_api.search_publication_by_criteria({
                 "metadata.identifiers.id": doi,
                 "metadata.identifiers.type": 'DOI'
             })
-            if pub:
-                print("Publication {doi} already exists in PuRe, skipping...")
-            else:
-                if (doi_data:=self.collect_data_for_doi(doi)):
-                    dois_data.append(doi_data)
-                else:
-                    print('Publication not found on Crossref, skipping...')
-        return dois_data
 
-    def write_dois_data(self, path_in, path_out, overwrite = False):
-        print("path_out",path_out)
-        df = pd.read_csv(
-            path_in,
-            encoding='ISO-8859-1',
-            engine='python',
-            on_bad_lines='skip'
-        )
-        if 'DOI' not in df.columns:
-            df = pd.read_csv(path_in, delimiter='\t', encoding='ISO-8859-1')
-            if 'DOI' not in df.columns:
-                raise RuntimeError(f"DOI col not found in the CSV file.")
-        dfo = df['DOI'].dropna()
-        dois_data = self.collect_data_for_dois(list(dfo))
-        if not dois_data:
+            if pub:
+                field.append("Already exists in PuRe")
+                titles.append(pub[0].get('data', {}).get('metadata', {}).get('title', 'Title not specified in PuRe'))
+                publication_dates.append(pub[0].get('data', {}).get('metadata', {}).get('datePublishedInPrint', 'Date not specified in PuRe'))
+            else:
+                crossref_metadata = self.get_crossref_metadata(doi)
+                scopus_metadata = self.get_scopus_metadata(doi)
+
+                if not crossref_metadata:
+                    field.append('Publication not found on Crossref')
+                    titles.append('Unknown Title')
+                    publication_dates.append('Unknown Date')
+                else:
+                    titles.append(crossref_metadata.get('title', 'Unknown Title'))
+                    publication_dates.append(crossref_metadata.get('published-online', 'Unknown Date'))
+                    main_author = crossref_metadata.get('author', {'affiliation': ['Max-Planck']})[0]
+                    has_mp_affiliation = False
+                    for affiliation in main_author['affiliation']:
+                        print("hah",unidecode(main_author.get('given', '')) + ' ' + unidecode(main_author.get('family', '')), affiliation)
+                        if 'Max-Planck' in affiliation.get('name', '') or 'Max Planck' in affiliation.get('name', ''):
+                            has_mp_affiliation = True
+                    if not has_mp_affiliation:
+                        main_author_name = unidecode(main_author.get('given', '')) + ' ' + unidecode(main_author.get('family', ''))
+                        field.append(f'Author "{main_author_name}" has no Max-Planck affiliation')
+
+            fields.append("\n".join(field))
+        df = pd.DataFrame({
+            'Title': titles,
+            'Publication Date': publication_dates,
+            'DOI': dois,
+            'Field': fields
+        })
+        # def highlight_rows(row):
+        #     if "PuRe" in row['Field']:
+        #         return ['background-color: #233333' for _ in row]  # Dark greenish-blue
+        #     elif row['Field']:  # If there's something else in the Field column
+        #         return ['background-color: #433333' for _ in row]  # Dark reddish-brown
+        #     else:
+        #         return ['background-color: #999900' for _ in row]  # Yellowish for empty Field
+        # print(df.style.apply(highlight_rows, axis=1).render())
+        return df
+
+    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame) -> pd.DataFrame:
+        new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
+        dois_data = []
+        for doi in new_dois:
+            print("Processing Publication DOI", doi)
+            crossref_metadata = self.get_crossref_metadata(doi)
+            if not crossref_metadata:
+                return None
+            try:
+                scopus_metadata = self.get_scopus_metadata(doi)
+            except requests.HTTPError:
+                scopus_metadata = None
+            print("scopus_metadata", scopus_metadata)
+
+            def clean_html(raw_html):
+                soup = BeautifulSoup(raw_html, "html.parser")
+                return soup.get_text()
+            title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
+            container_title = crossref_metadata.get('container-title', [None])
+
+            journal_title = html.unescape(unidecode(container_title[0])) if container_title else None
+            license_list = crossref_metadata.get('license')
+            print("license_list",license_list)
+            license_url = license_list[-1].get('URL', '') if license_list else None
+            license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
+            page = crossref_metadata.get('page') if '-' in crossref_metadata.get('page', '') else ''
+            article_number = crossref_metadata.get('article-number', '')
+
+            license_type = 'closed'
+            if scopus_metadata:
+                affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
+                if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
+                    license_type = 'open'
+                    print("hah",crossref_metadata.get('link', [{}]))
+                    pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
+            else:
+                affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
+            cleaned_author_list = self.process_author_list(affiliations_by_name, title)
+
+            copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
+            if copyright:
+                copyright = copyright[0]
+
+            prefill_publication = OrderedDict({
+                "Title": [title, 35, ''],
+                # "Type": [data.get('type'), 15, ''],
+                "Journal Title": [journal_title, 25, ''],
+                "Publisher": [html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20, ''],
+                "Issue": [crossref_metadata.get('issue', None), 10, ''],
+                "Volume": [crossref_metadata.get('volume', None), 10, ''],
+                "Page": [page, 10, ''],
+                'Article Number': [article_number, 10, ''],
+                "ISSN": [html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15, ''],
+                "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
+                # 'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
+                'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
+                'DOI': [doi, 20, ''],
+                # 'License type': [license_type, 15, ''],
+                'License url': [license_url, 20, ''] if license_type=='open' else ['', 20, ''],
+                'License year': [license_year, 15, ''] if license_type=='open' else ['', 15, ''],
+                'Pdf found': ['' if license_type=='closed' else 'y' if pdf_found else 'n', 15, ''],
+                'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
+                'Copyright': [copyright, 15, '']
+            })
+
+            i = 1
+            for author, affiliations in cleaned_author_list.items():
+                for affiliation in affiliations:
+                    prefill_publication[f"Author {i}"] = [author, None, '']
+                    prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
+                    i = i+1
+            dois_data.append(prefill_publication)
+        return pd.DataFrame(dois_data)
+
+    def write_dois_data(self, path_out, df_dois_data):
+        if df_dois_data.empty:
+            # Handle empty DataFrame case
             empty_path = Path(os.path.abspath(path_out)).parent / f'{path_out.stem}_empty{path_out.suffix}'
             df = pd.DataFrame()
             df.to_excel(empty_path, index=False)
             print(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
-            # for key, val in dois_data[0].items():
-            #     print("key",key)
-            #     print("val", val)
-            #     print("val", [val[1], val[2]])
+
+            # Create column details based on the DataFrame columns
             column_details = OrderedDict({
-                key: [val[1], val[2]]
-                for key, val in dois_data[0].items()
-                if 'Author ' not in key and 'Affiliation ' not in key
+                col: [df_dois_data[col].iloc[0], df_dois_data[col].iloc[1]]
+                for col in df_dois_data.columns
+                if 'Author ' not in col and 'Affiliation ' not in col
             })
+            dois_data = df_dois_data.to_dict('records')
             create_sheet(path_out, self.affiliations_by_name_pubman,
                         column_details, n_authors,
-                        prefill_publications = dois_data)
+                        prefill_publications=dois_data)
             print(f"Saved {path_out} successfully.")
-
-
-    def iterate_over_sheets_in_folder(self, doi_sheets_dir, publications_sheets_dir):
-        for sheet_path in Path(doi_sheets_dir).iterdir():
-            path_out = Path(publications_sheets_dir / f'{Path(sheet_path.stem)}.xlsx')
-            print("path_outpath_out",path_out)
-            # path = Path(f'./Publication Templates/test.xlsx')
-            empty_path = Path(publications_sheets_dir / f'{Path(sheet_path.stem)}_empty.xlsx')
-            if path_out.exists():
-                print(f'Skipping "{path_out}" because the file already exists...')
-                continue
-            if empty_path.exists():
-                print(f'Skipping empty file "{path_out}" because the file already exists...')
-                continue
-            print(f'Reading {doi_sheets_dir}')
-            self.write_dois_data(sheet_path, path_out)
