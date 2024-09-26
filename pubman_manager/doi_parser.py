@@ -156,72 +156,46 @@ class DOIParser:
         raise RuntimeError
 
     def process_name(self, names_affiliations, name):
-        def normalize_name(name):
+        def normalize_name(n):
             """Normalize the name to ignore special characters and case."""
-            return unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8').lower()
+            return unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8').lower()
 
         def get_initials(name_parts):
             """Get the initials from name parts."""
-            return ''.join([part[0] for part in name_parts if part])
+            return ''.join(part[0] for part in name_parts if part)
 
         normalized_name = normalize_name(name)
         abbrev_parts = normalized_name.replace('.', '').split()
         surname = abbrev_parts[-1]
-        first_name_parts = abbrev_parts[:-1]
-        name_initials = get_initials(first_name_parts)
+        abbrev_first_names = abbrev_parts[:-1]
+        abbrev_initials = get_initials(abbrev_first_names)
 
-        best_match = None
-        best_score = -1
+        candidates = []
+        exact_matches = []
 
-        # Special case handling for 'M.P. Singh' -> 'Mahander Pratap Singh'
-        if name == 'M.P. Singh':
-            return 'Mahander Pratap Singh'
-
-        # Special case handling for 'L. T. Stephenson' -> 'Leigh Stephenson'
-        if name == 'L. T. Stephenson':
-            return 'Leigh Stephenson'
-
-        # Ensure 'Johanna Xu' matches exactly
-        if name == 'Johanna Xu':
-            return 'Johanna Xu'
-
-        # Special case for 'Sung-Gyu Kang' matching 'Sung Gyu Kang'
-        if name == 'Sung-Gyu Kang':
-            return 'Sung Gyu Kang'
-
-        # Iterate over the names_affiliations to find the best match
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
             full_name_parts = normalized_full_name.split()
             candidate_surname = full_name_parts[-1]
-            candidate_first_name_parts = full_name_parts[:-1]
-            candidate_initials = get_initials(candidate_first_name_parts)
+            candidate_first_names = full_name_parts[:-1]
+            candidate_initials = get_initials(candidate_first_names)
 
-            # Check if surnames match
-            if surname.replace('-', '') == candidate_surname.replace('-', ''):
-                score = 0
+            if surname.replace('-', '').replace(' ', '') == candidate_surname.replace('-', '').replace(' ', ''):
+                if abbrev_first_names == candidate_first_names:
+                    exact_matches.append(full_name)
+                elif abbrev_initials == candidate_initials[:len(abbrev_initials)]:
+                    candidates.append((full_name, len(candidate_first_names)))
 
-                # Exact first name match
-                if ' '.join(first_name_parts) == ' '.join(candidate_first_name_parts):
-                    score += 3  # Highest priority
-                # First names match when middle names are stripped
-                elif first_name_parts and candidate_first_name_parts and first_name_parts[0] == candidate_first_name_parts[0]:
-                    score += 2
-                # Initials match
-                elif name_initials == candidate_initials:
-                    score += 1
+        if exact_matches:
+            return exact_matches[0]
+        elif candidates:
+            return max(candidates, key=lambda x: (len(abbrev_initials), x[1]))[0]
 
-                # Prefer names with fewer parts (less ambiguity)
-                score -= len(full_name_parts) * 0.1
-
-                if score > best_score:
-                    best_match = full_name
-                    best_score = score
-
-        if best_match:
-            return best_match
-
-        # If no match is found, return the original name
+        # Attempt to remove middle name and try again
+        if len(abbrev_first_names) > 1:  # If there is a middle name, remove it and try again
+            abbrev_without_middle = [abbrev_first_names[0]] + [surname]
+            new_name = ' '.join(abbrev_without_middle)
+            return self.process_name(names_affiliations, new_name)
         return name
 
     def process_author_list(self,
