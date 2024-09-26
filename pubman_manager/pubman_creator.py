@@ -13,8 +13,8 @@ import re
 import math
 
 class PubmanCreator(PubmanBase):
-    def __init__(self, username, password, base_url = "https://pure.mpg.de/rest"):
-        super().__init__(username, password, base_url)
+    def __init__(self, username=None, password=None, base_url = "https://pure.mpg.de/rest"):
+        super().__init__(username=username, password=password, base_url=base_url)
         with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'r') as f:
             self.identifier_paths = yaml.safe_load(f)
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r') as f:
@@ -91,7 +91,7 @@ class PubmanCreator(PubmanBase):
         request_list = []
 
         for index, row in df.iterrows():
-            print(f"Generating requests for \"{row.get('Talk Title')}\"")
+            self.log.info(f"Generating requests for \"{row.get('Talk Title')}\"")
             authors_info = self.get_authors_info(row)
             metadata_creators = []
             for author, info in authors_info.items():
@@ -163,61 +163,12 @@ class PubmanCreator(PubmanBase):
             )
         self.create_items(request_list, create_items=create_items, submit_items=submit_items, overwrite=overwrite)
 
-    def fetch_sample_documents(self, size=5):
-        """Fetch a small sample of documents to explore the structure."""
-        search_url = f"{self.base_url}/items/search"
-
-        query = {
-            "query": {
-                "match_all": {}  # This will fetch all documents
-            },
-            "size": size  # Fetch only a few documents
-        }
-
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
-
-        response = requests.post(search_url, headers=headers, json=query)
-
-        if response.status_code == 200:
-            results = response.json().get('records', [])
-            for result in results:
-                print(json.dumps(result, indent=2))  # Pretty-print the JSON structure
-        else:
-            raise Exception(f"Failed to fetch sample documents: {response.status_code} {response.text}")
-
-    def fetch_sample_document(self):
-        search_url = f"{self.base_url}/items/search"
-
-        query = {
-            "query": {
-                "match_all": {}
-            },
-            "size": 1  # Fetch a single document
-        }
-
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
-
-        response = requests.post(search_url, headers=headers, json=query)
-
-        if response.status_code == 200:
-            document = response.json().get('records', [])[0]  # Fetch the first document
-            print(json.dumps(document, indent=2))  # Pretty-print the document for inspection
-            return document
-        else:
-            raise Exception(f"Failed to fetch sample document: {response.status_code} {response.text}")
-
     def upload_pdf(self, pdf_path):
         """Upload the PDF if it doesn't already exist in the repository."""
         pdf_path = Path(pdf_path)
         file_title = pdf_path.name
 
-        # Check if the file with the same title already exists
+        # TODO: find way to check if the file with the same title already exists
         # existing_file_id = self.search_file_by_title(file_title)
         # if existing_file_id:
         #     print(f"File with title '{file_title}' already exists. Returning existing file ID: {existing_file_id}")
@@ -235,7 +186,7 @@ class PubmanCreator(PubmanBase):
 
         if response.status_code in [200, 201]:
             file_id = response.json()
-            print(f"File uploaded successfully. File ID: {file_id}")
+            self.log.debug(f"File uploaded successfully. File ID: {file_id}")
             return file_id
         else:
             raise Exception(f"Failed to upload file: {response.status_code} {response.text}")
@@ -247,14 +198,11 @@ class PubmanCreator(PubmanBase):
         for index, row in df.iterrows():
             title = row.get('Title')
             if not title:
-                print(f"Warning, missing entry for row {index}")
-                continue
-            print(f"Generating requests for \"{title}\"")
+                raise RuntimeError(f"Missing entry for row {index}")
             authors_info = self.get_authors_info(row)
 
             metadata_creators = []
             for author, info in authors_info.items():
-                print("author",author,author.split(' ', 1))
                 given_name, family_name = author.split(' ', 1)
                 affiliation_list = []
                 for affiliation in info['affiliations']:
@@ -324,14 +272,10 @@ class PubmanCreator(PubmanBase):
             if article_number:=row.get('Article Number'):
                 sources[0]['sequenceNumber'] = int(article_number)
 
-            print("sources",sources)
             files = []
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
-            print("pdf_path",pdf_path)
             if row.get('License url') and pdf_path.exists():
-                print("PDFTHERE")
                 file_id = self.upload_pdf(pdf_path)
-
                 file =  {
                     "objectId": '',
                     "name": pdf_path.name,
@@ -342,7 +286,7 @@ class PubmanCreator(PubmanBase):
                     },
                     "pid" : "",
                     'content': file_id,
-                    "visibility": "PUBLIC",  # Set according to your needs
+                    "visibility": "PUBLIC",
                     "contentCategory": "publisher-version",
                     "checksum" : "",
                     "checksumAlgorithm" : "MD5",
@@ -373,7 +317,7 @@ class PubmanCreator(PubmanBase):
                         pass
                 file['metadata']['contentCategory'] = 'pre-print' if 'arxiv' in license_url else 'publisher-version'
                 files.append(file)
-            # Building the request dictionary
+
             request = {
                 "context": {
                     "objectId": self.ctx_id,
@@ -412,13 +356,10 @@ class PubmanCreator(PubmanBase):
                     "metadata.identifiers.id": doi,
                 }, request)
             )
-        print("request",request)
-        print("request_list0",request_list)
         if create_items:
             self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
 
     def create_items(self, request_list, create_items = True, submit_items=False, overwrite=False):
-        print("request_list1")
         item_ids = []
         for criteria, request_json in request_list:
             created_item = None
@@ -426,19 +367,18 @@ class PubmanCreator(PubmanBase):
             existing_publication = self.search_publication_by_criteria(criteria)
             if existing_publication:
                 if overwrite:
-                    print(f"Overwriting existing publication: '{title}' with criteria '{criteria}':")
+                    self.log.info(f"Overwriting existing publication: '{title}' with criteria '{criteria}':")
                     for pub in existing_publication:
                         deleted = self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
                         if not deleted:
-                            print(f"Publication \"{title}\" cannot be deleted, skipping...")
+                            self.log.info(f"Publication \"{title}\" cannot be deleted, skipping...")
                 else:
-                    print(f"Publication already exists, skipping creation: '{criteria}'")
+                    self.log.info(f"Publication already exists, skipping creation: '{criteria}'")
                     created_item = existing_publication[0]['data']
                     item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
                     continue
             if create_items:
-                print(f"Creating new publication: '{criteria}'")
-                print("request_json",request_json)
+                self.log.info(f"Creating new publication: '{criteria}'")
                 created_item = self.create_item(request_json)
             if created_item:
                 item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
@@ -446,7 +386,7 @@ class PubmanCreator(PubmanBase):
         if submit_items:
             for item_id, modification_date, version_state in item_ids:
                 if version_state not in ['PENDING', 'IN_REVISION']:
-                    print(f"Entry already has the state '{version_state}', skipping...")
+                    self.log.info(f"Entry already has the state '{version_state}', skipping...")
                 else:
                     submitted_item = self.submit_item(item_id, modification_date)
-                    print(f"Submitted item: {submitted_item}")
+                    self.log.info(f"Submitted item: {submitted_item}")

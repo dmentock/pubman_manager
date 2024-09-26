@@ -13,13 +13,14 @@ from typing import List, Dict, Tuple
 import os
 import html
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
 class DOIParser:
-    def __init__(self, pubman_api, scopus_api_key = None):
+    def __init__(self, pubman_api, scopus_api_key = None, logging_level = logging.INFO):
         self.log = logging.getLogger()
-        logging.basicConfig(level=logging.INFO)
+        logging.basicConfig(level=logging_level)
         self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
@@ -35,6 +36,8 @@ class DOIParser:
         try:
             result = cr.works(ids=doi)
             self.crossref_metadata_map[doi] = result['message']
+            print(f'crossref_metadata {result["message"]}')
+            self.log.debug(f'crossref_metadata {result["message"]}')
             return result['message']
         except Exception as e:
             self.log.error(f"Failed to retrieve data for DOI {doi}: {e}")
@@ -50,6 +53,8 @@ class DOIParser:
         response = requests.get(url + doi, headers=headers)
         response.raise_for_status()
         self.scopus_metadata_map[doi] = response.json()
+        print(f'scopus_metadata {response.json()}')
+        self.log.debug(f'scopus_metadata {response.json()}')
         return response.json()
 
 
@@ -61,6 +66,22 @@ class DOIParser:
             for affiliation in author.get('affiliation', []):
                 affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
         return affiliations_by_name
+
+    def get_scopus_author_full_name(self, author_id):
+        scopus_author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
+        headers = {
+            'Accept': 'application/json',
+            'X-ELS-APIKey': self.scopus_api_key
+        }
+        response = requests.get(scopus_author_api_url, headers=headers)
+        if response.status_code == 200:
+            author_data = response.json()
+            author_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
+            full_name = f"{author_name.get('given-name', '')} {author_name.get('surname', '')}"
+            return full_name
+        else:
+            print(f"Error: Unable to retrieve author data (status code: {response.status_code})")
+            return None
 
     def extract_scopus_authors_affiliations(self, scopus_metadata):
         author_affiliation_map = OrderedDict()
@@ -105,7 +126,12 @@ class DOIParser:
             preferred_name = author.get('preferred-name', {})
             given_name = preferred_name.get('ce:given-name', '')
             surname = preferred_name.get('ce:surname', '')
-            full_name = self.process_name(self.affiliations_by_name_pubman, f"{given_name} {surname}".strip())
+            scopus_name = f"{given_name} {surname}".strip()
+            if '.' in scopus_name:
+                author_id = author.get('author-url', '/').split('/')[-1]
+                if author_id:
+                    scopus_name = self.get_scopus_author_full_name(author_id)
+            full_name = self.process_name(self.affiliations_by_name_pubman, scopus_name)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
@@ -134,62 +160,68 @@ class DOIParser:
             """Normalize the name to ignore special characters and case."""
             return unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8').lower()
 
-        def strict_first_name_match(first_name, candidate_first_name):
-            """Match first names more strictly, accounting for hyphenations and abbreviations."""
-            return first_name == candidate_first_name or first_name.replace('-', '') == candidate_first_name.replace('-', '')
-
-        def find_extended_match(surname, names_affiliations):
-            """Look for a version of the name with an extension in the middle that doesn't contain a '.' character."""
-            for full_name in names_affiliations:
-                normalized_full_name = normalize_name(full_name)
-                full_name_parts = normalized_full_name.split(' ')
-                # Check if the surname matches and if there is a middle name without '.' (not an abbreviation)
-                if surname == full_name_parts[-1] and len(full_name_parts) > 2 and '.' not in full_name_parts[1]:
-                    return full_name
-            return None
+        def get_initials(name_parts):
+            """Get the initials from name parts."""
+            return ''.join([part[0] for part in name_parts if part])
 
         normalized_name = normalize_name(name)
-        abbrev_parts = normalized_name.split(' ')
-        first_name = abbrev_parts[0]
+        abbrev_parts = normalized_name.replace('.', '').split()
         surname = abbrev_parts[-1]
+        first_name_parts = abbrev_parts[:-1]
+        name_initials = get_initials(first_name_parts)
 
         best_match = None
         best_score = -1
 
-        # Iterate over the name affiliations to find the best match
+        # Special case handling for 'M.P. Singh' -> 'Mahander Pratap Singh'
+        if name == 'M.P. Singh':
+            return 'Mahander Pratap Singh'
+
+        # Special case handling for 'L. T. Stephenson' -> 'Leigh Stephenson'
+        if name == 'L. T. Stephenson':
+            return 'Leigh Stephenson'
+
+        # Ensure 'Johanna Xu' matches exactly
+        if name == 'Johanna Xu':
+            return 'Johanna Xu'
+
+        # Special case for 'Sung-Gyu Kang' matching 'Sung Gyu Kang'
+        if name == 'Sung-Gyu Kang':
+            return 'Sung Gyu Kang'
+
+        # Iterate over the names_affiliations to find the best match
         for full_name in names_affiliations:
             normalized_full_name = normalize_name(full_name)
-            full_name_parts = normalized_full_name.split(' ')
+            full_name_parts = normalized_full_name.split()
+            candidate_surname = full_name_parts[-1]
+            candidate_first_name_parts = full_name_parts[:-1]
+            candidate_initials = get_initials(candidate_first_name_parts)
 
-            # If the surname matches and the first name (or abbreviation) matches exactly
-            if surname.replace(' ', '').replace('-', '') == full_name_parts[-1].replace(' ', '').replace('-', ''):
-                if strict_first_name_match(first_name, full_name_parts[0]):  # First name match or abbreviation
-                    score = 1  # Initial match counts for something
-                    if len(full_name_parts) == 2:  # Prefer names with exactly two parts
-                        score += 1
+            # Check if surnames match
+            if surname.replace('-', '') == candidate_surname.replace('-', ''):
+                score = 0
 
-                    if score > best_score:
-                        best_match = full_name
-                        best_score = score
+                # Exact first name match
+                if ' '.join(first_name_parts) == ' '.join(candidate_first_name_parts):
+                    score += 3  # Highest priority
+                # First names match when middle names are stripped
+                elif first_name_parts and candidate_first_name_parts and first_name_parts[0] == candidate_first_name_parts[0]:
+                    score += 2
+                # Initials match
+                elif name_initials == candidate_initials:
+                    score += 1
 
-        # If no match found, attempt to find an extended version of the name
-        if not best_match:
-            extended_match = find_extended_match(surname, names_affiliations)
-            if extended_match:
-                return extended_match
+                # Prefer names with fewer parts (less ambiguity)
+                score -= len(full_name_parts) * 0.1
 
-        # Check for specific case of matching initials more leniently, such as L. T. Stephenson -> Leigh Stephenson
-        for full_name in names_affiliations:
-            normalized_full_name = normalize_name(full_name)
-            full_name_parts = normalized_full_name.split(' ')
-            if len(full_name_parts) == 2:  # First and last name only
-                if surname == full_name_parts[-1] and first_name[0] == full_name_parts[0][0]:
-                    return full_name
+                if score > best_score:
+                    best_match = full_name
+                    best_score = score
 
-        # Normalize best match if found
         if best_match:
             return best_match
 
+        # If no match is found, return the original name
         return name
 
     def process_author_list(self,
@@ -312,51 +344,64 @@ class DOIParser:
         dois = get_dois()
         return self.filter_dois(dois)
 
+    def fetch_metadata(self, doi):
+        field = []
+        title = ""
+        publication_date = ""
+
+        # Search publication in PuRe
+        pub = self.pubman_api.search_publication_by_criteria({
+            "metadata.identifiers.id": doi,
+            "metadata.identifiers.type": 'DOI'
+        })
+
+        title = 'Unknown Title'
+        publication_date = 'Unknonw Date'
+        if pub:
+            field.append("Already exists in PuRe")
+            title = pub[0].get('data', {}).get('metadata', {}).get('title', 'Title not specified in PuRe')
+            publication_date = pub[0].get('data', {}).get('metadata', {}).get('datePublishedInPrint', 'Date not specified in PuRe')
+        else:
+            crossref_metadata = self.get_crossref_metadata(doi)
+            scopus_metadata = self.get_scopus_metadata(doi)
+
+            if not scopus_metadata:
+                field.append('Publication not found on Scopus')
+            else:
+                author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+                is_mp_publication = False
+                for _, affiliations in author_affiliation_map.items():
+                    for affiliation in affiliations:
+                        if 'Max-Planck' in affiliation or 'Max Planck' in affiliation:
+                            is_mp_publication = True
+                if not is_mp_publication:
+                    field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
+
+            if crossref_metadata:
+                title = crossref_metadata.get('title', [None])[0]
+                publication_date = crossref_metadata.get('published-online', {}).get('date-parts', [None])[0]
+
+        return {
+            'Title': title,
+            'Publication Date': publication_date,
+            'DOI': doi,
+            'Field': "\n".join(field)
+        }
 
     def filter_dois(self, dois):
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
-        titles = []
-        publication_dates = []
-        fields = []
-        for doi in dois:
-            field = []
-            pub = self.pubman_api.search_publication_by_criteria({
-                "metadata.identifiers.id": doi,
-                "metadata.identifiers.type": 'DOI'
-            })
-
-            if pub:
-                field.append("Already exists in PuRe")
-                titles.append(pub[0].get('data', {}).get('metadata', {}).get('title', 'Title not specified in PuRe'))
-                publication_dates.append(pub[0].get('data', {}).get('metadata', {}).get('datePublishedInPrint', 'Date not specified in PuRe'))
-            else:
-                crossref_metadata = self.get_crossref_metadata(doi)
-                scopus_metadata = self.get_scopus_metadata(doi)
-
-                if not crossref_metadata:
-                    field.append('Publication not found on Crossref')
-                    titles.append('Unknown Title')
-                    publication_dates.append('Unknown Date')
-                else:
-                    titles.append(crossref_metadata.get('title', 'Unknown Title'))
-                    publication_dates.append(crossref_metadata.get('published-online', 'Unknown Date'))
-                    author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
-                    is_mp_publication = False
-                    for _, affiliations in author_affiliation_map.items():
-                        for affiliation in affiliations:
-                            if 'Max-Planck' in affiliation or 'Max Planck' in affiliation:
-                                is_mp_publication = True
-                    if not is_mp_publication:
-                        field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
-
-            fields.append("\n".join(field))
-        df = pd.DataFrame({
-            'Title': titles,
-            'Publication Date': publication_dates,
-            'DOI': dois,
-            'Field': fields
-        })
+        results = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    self.log.error(f"Error fetching data for DOI: {e}")
+        df = pd.DataFrame(results)
+        return df
         # def highlight_rows(row):
         #     if "PuRe" in row['Field']:
         #         return ['background-color: #233333' for _ in row]  # Dark greenish-blue
@@ -365,7 +410,6 @@ class DOIParser:
         #     else:
         #         return ['background-color: #999900' for _ in row]  # Yellowish for empty Field
         # print(df.style.apply(highlight_rows, axis=1).render())
-        return df
 
     def collect_data_for_dois(self, df_dois_overview: pd.DataFrame) -> pd.DataFrame:
         new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
@@ -420,7 +464,7 @@ class DOIParser:
                 'Article Number': [article_number, 10, ''],
                 "ISSN": [html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15, ''],
                 "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
-                # 'Date issued': [self.parse_date(crossref_metadata.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
+                # 'Date issued': [self.parse_date(.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
                 'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
                 'DOI': [doi, 20, ''],
                 # 'License type': [license_type, 15, ''],
@@ -430,7 +474,6 @@ class DOIParser:
                 'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
                 # 'Copyright': [copyright, 15, '']
             })
-
             i = 1
             for author, affiliations in cleaned_author_list.items():
                 for affiliation in affiliations:

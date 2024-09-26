@@ -1,3 +1,6 @@
 BASE_URL="https://pure.mpg.de/rest"
 USERNAME="<username>"
 PASSWORD="<password>"
+
+SCOPUS_API_KEY="<key>"
+SCOPUS_AFFILIATION_ID="60026606" # Scopus ID for MPIE
