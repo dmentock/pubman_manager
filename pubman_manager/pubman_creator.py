@@ -269,7 +269,8 @@ class PubmanCreator(PubmanBase):
                 sources[0]['endPage'] = row.get('Page').split('-')[-1].strip()
                 sources[0]['totalNumberOfPages'] = int(row.get('Page').split('-')[-1].strip()) - \
                           int(row.get('Page').split('-')[0].strip()) + 1
-            if article_number:=row.get('Article Number'):
+            article_number = row.get('Article Number')
+            if article_number and not math.isnan(article_number):
                 sources[0]['sequenceNumber'] = int(article_number)
 
             files = []

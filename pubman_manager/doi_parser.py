@@ -19,8 +19,8 @@ from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS
 
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None, logging_level = logging.INFO):
-        self.log = logging.getLogger()
-        logging.basicConfig(level=logging_level)
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging_level)
         self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
@@ -36,7 +36,6 @@ class DOIParser:
         try:
             result = cr.works(ids=doi)
             self.crossref_metadata_map[doi] = result['message']
-            print(f'crossref_metadata {result["message"]}')
             self.log.debug(f'crossref_metadata {result["message"]}')
             return result['message']
         except Exception as e:
@@ -53,10 +52,8 @@ class DOIParser:
         response = requests.get(url + doi, headers=headers)
         response.raise_for_status()
         self.scopus_metadata_map[doi] = response.json()
-        print(f'scopus_metadata {response.json()}')
         self.log.debug(f'scopus_metadata {response.json()}')
         return response.json()
-
 
     def extract_crossref_authors_affiliations(self, crossref_metadata):
         affiliations_by_name = OrderedDict()
@@ -83,7 +80,10 @@ class DOIParser:
             print(f"Error: Unable to retrieve author data (status code: {response.status_code})")
             return None
 
-    def extract_scopus_authors_affiliations(self, scopus_metadata):
+    def extract_scopus_authors_affiliations(self, scopus_metadata) -> OrderedDict[str, List[str]]:
+        """
+        Generates an ordered mapping from authors to their affiliations with the Scopus API
+        """
         author_affiliation_map = OrderedDict()
         authors_list = scopus_metadata['abstracts-retrieval-response']['authors']['author']
         author_groups = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['author-group']
@@ -112,7 +112,7 @@ class DOIParser:
                 country = affiliation_info.get('country', '')
                 if organization_names:
                     parts = organization_names + [city, postal_code, country]
-                    full_affiliation = ', '.join(filter(None, parts))  # Remove empty parts
+                    full_affiliation = ', '.join(filter(None, parts))
                     affiliation_list.append(full_affiliation)
                 else:
                     full_affiliation = ', '.join(filter(None, [department_name, city, postal_code, country]))
@@ -190,9 +190,7 @@ class DOIParser:
             return exact_matches[0]
         elif candidates:
             return max(candidates, key=lambda x: (len(abbrev_initials), x[1]))[0]
-
-        # Attempt to remove middle name and try again
-        if len(abbrev_first_names) > 1:  # If there is a middle name, remove it and try again
+        if len(abbrev_first_names) > 1:
             abbrev_without_middle = [abbrev_first_names[0]] + [surname]
             new_name = ' '.join(abbrev_without_middle)
             return self.process_name(names_affiliations, new_name)
@@ -201,6 +199,9 @@ class DOIParser:
     def process_author_list(self,
                             affiliations_by_name: Dict[str, List[str]],
                             title: str) -> Dict[str, List[Tuple[str, str]]]:
+        """
+        Go over list of authors and affiliations from scopus, compare to PuRe entries and possibly adopt PuRe if differences are small
+        """
         non_mpg_affiliations = Counter()
         pubman_affiliations = set()
         processed_affiliations = {}
@@ -251,6 +252,10 @@ class DOIParser:
         return processed_affiliations
 
     def download_pdf(self, pdf_link, doi):
+        """
+        Download PDF for given DOI with Scopus API
+        """
+
         self.log.debug(f"Attempting to download PDF for DOI: {doi}")
         self.log.debug(f"PDF link: {pdf_link}")
         if pdf_link is None:
@@ -271,6 +276,10 @@ class DOIParser:
                             pubyear_start=None,
                             pubyear_end=None,
                             extra_queries: List[str] = None):
+        """
+        Use Scopus API to generate a list of DOIs from an author name with the Affiliation ID from the .env file
+        """
+
         BASE_URL = "https://api.elsevier.com/content/search/scopus"
 
         query_components = [f'AF-ID({SCOPUS_AFFILIATION_ID})']
@@ -319,11 +328,13 @@ class DOIParser:
         return self.filter_dois(dois)
 
     def fetch_metadata(self, doi):
+        """
+        Helper function to parallelize `filter_dois` method
+        """
         field = []
         title = ""
         publication_date = ""
 
-        # Search publication in PuRe
         pub = self.pubman_api.search_publication_by_criteria({
             "metadata.identifiers.id": doi,
             "metadata.identifiers.type": 'DOI'
@@ -362,7 +373,10 @@ class DOIParser:
             'Field': "\n".join(field)
         }
 
-    def filter_dois(self, dois):
+    def filter_dois(self, dois: List[str]) -> pd. DataFrame:
+        """
+        Takes list of DOIs, checks if it already exists on PuRe as well as the availability on Crossref and Scopus, returns overview dataframe
+        """
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
         results = []
@@ -385,7 +399,18 @@ class DOIParser:
         #         return ['background-color: #999900' for _ in row]  # Yellowish for empty Field
         # print(df.style.apply(highlight_rows, axis=1).render())
 
-    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame) -> pd.DataFrame:
+    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame) -> List[OrderedDict[str, Tuple[str, int, str]]]:
+        """
+        Takes overview dataframe, collects all data for DOIs which are not yet on PuRe and have Scopus and Crossref entries.
+        Generates dataframe which can be passed to the excel_generator.create_sheet method to prefill the sheet with data.
+
+        Result
+        ------
+
+        Each entry in the result list is a dict that corresponds to a publication.
+        The dict maps column data to a tuple, e.g. `"Title": [title, 35, '']`
+        Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
+        """
         new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
         dois_data = []
         for doi in new_dois:
