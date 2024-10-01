@@ -24,8 +24,14 @@ class DOIParser:
         self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
-            authors_info = yaml.safe_load(f)
-        self.affiliations_by_name_pubman = OrderedDict({key: val['affiliations'] for key, val in authors_info.items() if val})
+            self.affiliations_by_name_pubman = yaml.load(f, Loader=yaml.FullLoader)
+        mpi_affiliation_counter = Counter()
+        for author, author_info in self.affiliations_by_name_pubman.items():
+            for affiliation in author_info['affiliations']:
+                if 'Max-Planck' in affiliation:
+                    print("affiliation",affiliation)
+                    mpi_affiliation_counter[affiliation]+=1
+        self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.crossref_metadata_map = {}
         self.scopus_metadata_map = {}
 
@@ -58,7 +64,7 @@ class DOIParser:
     def extract_crossref_authors_affiliations(self, crossref_metadata):
         affiliations_by_name = OrderedDict()
         for author in crossref_metadata.get('author', []):
-            author_name = self.process_name(self.affiliations_by_name_pubman, unidecode(author.get('given', '')) + ' ' + unidecode(author.get('family', '')))
+            author_name = self.process_name(self.affiliations_by_name_pubman.keys(), unidecode(author.get('given', ''))), unidecode(unidecode(author.get('family', '')))
             affiliations_by_name[author_name] = []
             for affiliation in author.get('affiliation', []):
                 affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
@@ -71,13 +77,22 @@ class DOIParser:
             'X-ELS-APIKey': self.scopus_api_key
         }
         response = requests.get(scopus_author_api_url, headers=headers)
+
         if response.status_code == 200:
             author_data = response.json()
-            author_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
-            full_name = f"{author_name.get('given-name', '')} {author_name.get('surname', '')}"
-            return full_name
+            preferred_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
+            print("preferred_name.get('given-name', '')",preferred_name.get('given-name', ''))
+            print("preferred_name.get('surname', '')",preferred_name.get('surname', ''))
+            if '.' in (first_name:=preferred_name.get('given-name', '').split()[0]):
+                name_variants = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('name-variant', [])
+                if isinstance(name_variants, list):
+                    for variant in name_variants:
+                        if len(variant_name:=variant.get('given-name', '')) > len(first_name):
+                            first_name = variant_name
+                            break
+            return first_name, preferred_name.get('surname', '')
         else:
-            print(f"Error: Unable to retrieve author data (status code: {response.status_code})")
+            self.log.error(f"Unable to retrieve author data for author {author_id} (status code: {response.status_code}, {response.text}")
             return None
 
     def extract_scopus_authors_affiliations(self, scopus_metadata) -> OrderedDict[str, List[str]]:
@@ -124,14 +139,14 @@ class DOIParser:
                 author_id_to_affiliations[author_id].extend(affiliation_list)
         for author in authors_list:
             preferred_name = author.get('preferred-name', {})
-            given_name = preferred_name.get('ce:given-name', '')
+            first_name = preferred_name.get('ce:given-name', '')
             surname = preferred_name.get('ce:surname', '')
-            scopus_name = f"{given_name} {surname}".strip()
-            if '.' in scopus_name:
+            if '.' in first_name:
                 author_id = author.get('author-url', '/').split('/')[-1]
                 if author_id:
-                    scopus_name = self.get_scopus_author_full_name(author_id)
-            full_name = self.process_name(self.affiliations_by_name_pubman, scopus_name)
+                    first_name, surname = self.get_scopus_author_full_name(author_id)
+            full_name = self.process_name(self.affiliations_by_name_pubman.keys(), first_name, surname)
+            # print("full_name",full_name)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
@@ -155,100 +170,233 @@ class DOIParser:
                 return date_value[0]
         raise RuntimeError
 
-    def process_name(self, names_affiliations, name):
-        def normalize_name(n):
-            """Normalize the name to ignore special characters and case."""
-            return unicodedata.normalize('NFKD', n).encode('ASCII', 'ignore').decode('utf-8').lower()
+    def process_name(self, pubman_names, first_name, surname):
+        def normalize_name_for_comparison(name):
+            name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8').strip()
+            return ''.join(name.lower().replace('.', '').replace('-', '').split()).strip()
+        def get_initials(name):
+            name_parts = name.replace('.', '').replace('-', ' ').split()
+            initials = ''.join([part[0] for part in name_parts if part])
+            return initials.lower().strip()
 
-        def get_initials(name_parts):
-            """Get the initials from name parts."""
-            return ''.join(part[0] for part in name_parts if part)
+        def get_name_parts(name):
+            return name.replace('.', '').replace('-', ' ').split()
 
-        normalized_name = normalize_name(name)
-        abbrev_parts = normalized_name.replace('.', '').split()
-        surname = abbrev_parts[-1]
-        abbrev_first_names = abbrev_parts[:-1]
-        abbrev_initials = get_initials(abbrev_first_names)
+        def is_abbreviated(name):
+            return '.' in name
 
-        candidates = []
-        exact_matches = []
+        # Normalize incoming surname for comparison
+        surname_normalized = normalize_name_for_comparison(surname)
+        first_name_normalized = normalize_name_for_comparison(first_name)
+        first_name_initials = get_initials(first_name)
+        first_name_parts = get_name_parts(first_name)
 
-        for full_name in names_affiliations:
-            normalized_full_name = normalize_name(full_name)
-            full_name_parts = normalized_full_name.split()
-            candidate_surname = full_name_parts[-1]
-            candidate_first_names = full_name_parts[:-1]
-            candidate_initials = get_initials(candidate_first_names)
+        best_match = None
+        best_matching_type = float('inf')
+        best_first_name_parts_count = float('inf')
+        best_has_middle_name = True  # We prefer names without middle names
+        best_has_abbreviation = True  # We prefer names without abbreviations
 
-            if surname.replace('-', '').replace(' ', '') == candidate_surname.replace('-', '').replace(' ', ''):
-                if abbrev_first_names == candidate_first_names:
-                    exact_matches.append(full_name)
-                elif abbrev_initials == candidate_initials[:len(abbrev_initials)]:
-                    candidates.append((full_name, len(candidate_first_names)))
+        for pubman_firstname, pubman_surname in pubman_names:
+            pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
 
-        if exact_matches:
-            return exact_matches[0]
-        elif candidates:
-            return max(candidates, key=lambda x: (len(abbrev_initials), x[1]))[0]
-        if len(abbrev_first_names) > 1:
-            abbrev_without_middle = [abbrev_first_names[0]] + [surname]
-            new_name = ' '.join(abbrev_without_middle)
-            return self.process_name(names_affiliations, new_name)
-        return name
+            if surname_normalized != pubman_surname_normalized:
+                continue  # Surname does not match
 
-    def process_author_list(self,
-                            affiliations_by_name: Dict[str, List[str]],
-                            title: str) -> Dict[str, List[Tuple[str, str]]]:
+            pubman_firstname_normalized = normalize_name_for_comparison(pubman_firstname)
+            pubman_firstname_initials = get_initials(pubman_firstname)
+            pubman_firstname_parts = get_name_parts(pubman_firstname)
+
+            matching_type = None
+
+            if first_name_normalized == pubman_firstname_normalized:
+                matching_type = 0  # Exact match
+            elif first_name_initials == pubman_firstname_initials:
+                matching_type = 1  # Initials match
+            elif pubman_firstname_normalized.startswith(first_name_normalized):
+                matching_type = 2  # Incoming name is a prefix of the database name
+            elif pubman_firstname_initials.startswith(first_name_initials):
+                matching_type = 3  # Partial initials match
+            elif first_name_parts[0] == pubman_firstname_parts[0]:
+                matching_type = 4  # First name parts match
+            else:
+                continue  # No match
+
+            # Decide if this match is better than the best so far
+            pubman_has_middle_name = len(pubman_firstname_parts) > 1
+            pubman_has_abbreviation = is_abbreviated(pubman_firstname)
+            pubman_firstname_parts_count = len(pubman_firstname_parts)
+
+            if matching_type < best_matching_type:
+                best_match = (pubman_firstname, pubman_surname)
+                best_matching_type = matching_type
+                best_first_name_parts_count = pubman_firstname_parts_count
+                best_has_middle_name = pubman_has_middle_name
+                best_has_abbreviation = pubman_has_abbreviation
+            elif matching_type == best_matching_type:
+                # Prefer names without middle names if we find a better match
+                if pubman_has_middle_name:
+                    continue
+                elif not pubman_has_middle_name and best_has_middle_name:
+                    best_match = (pubman_firstname, pubman_surname)
+                    best_first_name_parts_count = pubman_firstname_parts_count
+                    best_has_middle_name = pubman_has_middle_name
+                    best_has_abbreviation = pubman_has_abbreviation
+                else:
+                    # Compare number of first name parts (fewer is better)
+                    if pubman_firstname_parts_count < best_first_name_parts_count:
+                        best_match = (pubman_firstname, pubman_surname)
+                        best_first_name_parts_count = pubman_firstname_parts_count
+                        best_has_abbreviation = pubman_has_abbreviation
+                    elif pubman_firstname_parts_count == best_first_name_parts_count:
+                        # Prefer entries without abbreviations
+                        if not pubman_has_abbreviation and best_has_abbreviation:
+                            best_match = (pubman_firstname, pubman_surname)
+                            best_has_abbreviation = pubman_has_abbreviation
+
+        # Search for a better match that excludes the middle name
+        if best_match and best_has_middle_name:
+            for pubman_firstname, pubman_surname in pubman_names:
+                pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
+                if surname_normalized == pubman_surname_normalized:
+                    # Check if a version of the first name without the middle name exists
+                    pubman_firstname_parts = get_name_parts(pubman_firstname)
+                    if len(pubman_firstname_parts) == 1 and pubman_firstname_parts[0] == first_name_parts[0]:
+                        return pubman_firstname, pubman_surname
+
+        if best_match:
+            return best_match
+        else:
+            # No match found, return incoming name with first name and surname, no middle name
+            first_name_no_middle = first_name.split()[0]
+            return first_name_no_middle, surname
+
+    def process_author_list(self, affiliations_by_name: Dict[str, List[str]], title: str) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Go over list of authors and affiliations from scopus, compare to PuRe entries and possibly adopt PuRe if differences are small
+        Go over list of authors and affiliations from Scopus, compare to PuRe entries,
+        and possibly adopt PuRe if differences are small.
         """
-        non_mpg_affiliations = Counter()
-        pubman_affiliations = set()
+        print("process_author_list", affiliations_by_name)
+
+        from collections import Counter
+        from fuzzywuzzy import process  # Assuming you have this import elsewhere
+
+        def is_mpi_affiliation(affiliation: str) -> bool:
+            """Check if the affiliation belongs to the Max-Planck Institute."""
+            return any(keyword in affiliation for keyword in ['Max-Planck', 'Max Planck', 'Max Plank'])
+
+        def process_scopus_affiliation(affiliation: str) -> str:
+            """Format Scopus affiliation string."""
+            return affiliation.replace('  ', ', ').replace(') ', '), ')
+
+        def handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations):
+            """Handle MPI affiliation processing."""
+            pubman_mpi_groups = [aff for aff in pubman_author_affiliations if is_mpi_affiliation(aff)]
+            print(f"Pubman MPI groups for {author}: {pubman_mpi_groups}")
+
+            if len(pubman_mpi_groups) == 1:
+                mpi_groups[pubman_mpi_groups[0]] += 1
+                return {
+                    'affiliation': pubman_mpi_groups[0],
+                    'color': 'yellow',
+                    'compare_error': 0,
+                    'comment': 'Found MPI match in database.'
+                }
+            elif len(pubman_mpi_groups) > 1:
+                ambiguous_mpi_affiliations[author] = pubman_mpi_groups
+                return {
+                    'affiliation': 'AMBIGUOUS MPI',
+                }
+            return {
+                'affiliation': 'MISSING MPI',
+            }
+
+        def handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations):
+            """Handle non-MPI affiliation using fuzzy matching."""
+            affiliation, score = process.extractOne(proposed_affiliation, pubman_author_affiliations)
+            compare_error = (100 - score) / 100
+            if score > 80:
+                return {
+                    'affiliation': affiliation,
+                    'color': 'green',
+                    'compare_error': compare_error,
+                    'comment': 'High confidence match from database.'
+                }
+            return {
+                'affiliation': process_scopus_affiliation(proposed_affiliation),
+                'color': 'gray',
+                'compare_error': 0,
+                'comment': f'Author or similar affiliation not found in database -> using affiliation from publisher (err={compare_error}).'
+            }
+        mpi_groups = Counter()
         processed_affiliations = {}
+        ambiguous_mpi_affiliations = {}
+
+        print("self.mpi_affiliations", self.mpi_affiliations)
+
+        # Process each author and their affiliations
         for author, affiliations in affiliations_by_name.items():
             processed_affiliations[author] = []
-            for i, proposed_affiliation in enumerate(affiliations if affiliations else ['']):
-                compare_error = ''
-                if self.affiliations_by_name_pubman.get(author):
-                    if not proposed_affiliation.strip():
-                        affiliation, score = process.extractOne(title, self.affiliations_by_name_pubman[author])
-                        color = 'orange'
-                    elif 'Max-Planck' in proposed_affiliation and \
-                          (pubman_mpi_pubs:=[pub for pub in self.affiliations_by_name_pubman[author] if 'Max-Planck' in pub]):
-                        affiliation, score = process.extractOne(title, pubman_mpi_pubs)
-                        color = 'purple'
+
+            for proposed_affiliation in affiliations if affiliations else []:
+                print(f"Processing author: {author}")
+                pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
+                if pubman_author_affiliations:
+                    print(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check:", is_mpi_affiliation(proposed_affiliation))
+
+                    if is_mpi_affiliation(proposed_affiliation):
+                        affiliation_info = handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations)
                     else:
-                        affiliation, score = process.extractOne(proposed_affiliation, self.affiliations_by_name_pubman[author])
-                        if score > 80:
-                            color = 'yellow'
-                        else:
-                            affiliation = proposed_affiliation.replace('  ', ', ').replace(') ', '), ')
-                            color = 'gray'
-                    compare_error = (100-score)/100
+                        affiliation_info = handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations)
                 elif proposed_affiliation.strip():
-                    affiliation = proposed_affiliation.replace('  ', ', ').replace(') ', '), ')
-                    color = 'gray' if 'Max-Planck' not in affiliation else 'red'
+                    print(f"No PuRe affiliation for {author}, but provided by Scopus: {proposed_affiliation}")
+                    if is_mpi_affiliation(proposed_affiliation):
+                        affiliation_info = {
+                            'affiliation': 'MISSING MPI',
+                        }
+                    else:
+                        affiliation_info = {
+                            'affiliation': process_scopus_affiliation(proposed_affiliation),
+                            'color': 'gray',
+                            'compare_error': 0,
+                            'comment': 'No PuRe affiliation for author, adopting Scopus affiliation.'
+                        }
                 else:
-                    continue
-                processed_affiliations[author].append([affiliation, color, compare_error])
-                if 'Max-Planck' not in affiliation:
-                    non_mpg_affiliations[affiliation] += 1
-                if color != 'gray':
-                    pubman_affiliations.add(affiliation)
-        if non_mpg_affiliations:
-            most_common_affiliation = non_mpg_affiliations.most_common(1)[0][0]
-        else:
-            most_common_affiliation = ''
+                    raise RuntimeError(f'Affiliation for {author} not found in PuRe or Scopus')
+
+                processed_affiliations[author].append(affiliation_info)
+
+                if affiliation_info['color'] != 'gray' and is_mpi_affiliation(affiliation_info['affiliation']):
+                    mpi_groups[affiliation_info['affiliation']] += 1
+
+        print("MPI groups:", mpi_groups)
+        most_common_mpi_group = mpi_groups.most_common(1)[0][0] if mpi_groups else self.mpi_affiliations[0]
+        print("Most common MPI group:", most_common_mpi_group)
+
+        # Resolve ambiguous MPI affiliations and assign missing MPI groups
         for author, affiliations in processed_affiliations.items():
-            if not affiliations:
-                processed_affiliations[author] = [[most_common_affiliation, 'red', '']]
-            for i, affiliation in enumerate(affiliations):
-                if affiliation[1] == 'gray':
-                    similar_affiliation, score = process.extractOne(affiliation[0], pubman_affiliations)
-                    if score > 90 and similar_affiliation not in affiliations:
-                        processed_affiliations[author][i][0] = similar_affiliation
-                        processed_affiliations[author][i][1] = 'pink'
-                        processed_affiliations[author][i][2] = (100-score)/100
+            for i, affiliation_info in enumerate(affiliations):
+                affiliation = affiliation_info['affiliation']
+                print(f"Author: {author}, Current affiliation: {affiliation}")
+
+                if affiliation == 'AMBIGUOUS MPI':
+                    print(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
+                    similar_affiliation, score = process.extractOne(most_common_mpi_group, ambiguous_mpi_affiliations[author])
+                    compare_error = (100 - score) / 100
+                    processed_affiliations[author][i] = {
+                        'affiliation': similar_affiliation,
+                        'color': 'yellow' if score > 95 else 'red',
+                        'compare_error': compare_error,
+                        'comment': 'Resolved ambiguous MPI affiliation using most common group.'
+                    }
+                elif affiliation == 'MISSING MPI':
+                    processed_affiliations[author][i] = {
+                        'affiliation': most_common_mpi_group,
+                        'color': 'yellow',
+                        'compare_error': 0,
+                        'comment': 'Assigned most common MPI group due to missing MPI affiliation.'
+                    }
+
         return processed_affiliations
 
     def download_pdf(self, pdf_link, doi):
@@ -354,10 +502,14 @@ class DOIParser:
                 field.append('Publication not found on Scopus')
             else:
                 author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+                print("author_affiliation_map",author_affiliation_map)
                 is_mp_publication = False
                 for _, affiliations in author_affiliation_map.items():
+                    # print(_)
                     for affiliation in affiliations:
-                        if 'Max-Planck' in affiliation or 'Max Planck' in affiliation:
+                        # print(affiliation)
+                        # Scopus sometimes has a Max Plank typo
+                        if 'Max-Planck' in affiliation.replace(' ', '') or 'Max Planck' in affiliation or 'Max Plank' in affiliation:
                             is_mp_publication = True
                 if not is_mp_publication:
                     field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
@@ -383,11 +535,8 @@ class DOIParser:
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
             for future in as_completed(futures):
-                try:
-                    result = future.result()
-                    results.append(result)
-                except Exception as e:
-                    self.log.error(f"Error fetching data for DOI: {e}")
+                result = future.result()
+                results.append(result)
         df = pd.DataFrame(results)
         return df
         # def highlight_rows(row):
@@ -439,13 +588,13 @@ class DOIParser:
             article_number = crossref_metadata.get('article-number', '')
 
             license_type = 'closed'
-            if scopus_metadata:
-                affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
-                if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
-                    license_type = 'open'
-                    pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
-            else:
-                affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
+            # if scopus_metadata:
+            affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
+            if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
+                license_type = 'open'
+                pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
+            # else:
+            #     affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
             cleaned_author_list = self.process_author_list(affiliations_by_name, title)
 
             # copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
@@ -474,10 +623,10 @@ class DOIParser:
                 # 'Copyright': [copyright, 15, '']
             })
             i = 1
-            for author, affiliations in cleaned_author_list.items():
-                for affiliation in affiliations:
-                    prefill_publication[f"Author {i}"] = [author, None, '']
-                    prefill_publication[f"Affiliation {i}"] = [affiliation[0], affiliation[1], '', affiliation[2]]
+            for (first_name, last_name), affiliations_info in cleaned_author_list.items():
+                for affiliation_info in affiliations_info:
+                    prefill_publication[f"Author {i}"] = [first_name + ' ' + last_name, None, '']
+                    prefill_publication[f"Affiliation {i}"] = [affiliation_info['affiliation'], affiliation[1], '', affiliation[2]]
                     i = i+1
             dois_data.append(prefill_publication)
         return dois_data
@@ -495,7 +644,7 @@ class DOIParser:
                 for key, val in dois_data[0].items()
                 if 'Author ' not in key and 'Affiliation ' not in key
             })
-            create_sheet(path_out, self.affiliations_by_name_pubman,
+            create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
                         column_details, n_authors,
                         prefill_publications = dois_data)
             self.log.info(f"Saved {path_out} successfully.")

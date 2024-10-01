@@ -1,7 +1,7 @@
 import xlsxwriter
 from collections import OrderedDict
 
-def create_sheet(file_path, names_affiliations, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
+def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided to determine the number of rows.")
 
@@ -39,7 +39,8 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
         'orange': '#ffd8b1',
         'red': '#ff9999',
         'purple': '#e6e6fa',
-        'pink': '#FFEEEE'
+        'pink': '#FFEEEE',
+        'green': '#ccffcc'
     }
 
     color_messages = {
@@ -53,13 +54,11 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}
 
-    names = list(names_affiliations.keys())
-    affiliations = names_affiliations
-
-    for row_index, name in enumerate(names):
+    names = list(affiliations_by_name_pubman.keys())
+    for row_index, (first_name, last_name) in enumerate(names):
         for col_index in range(n_authors):
             col = list(col_layout.keys()).index(f'Author {col_index + 1}')
-            main_sheet.write(row_index, col, name)
+            main_sheet.write(row_index, col, first_name + ' ' + last_name)
 
     for row_index in range(len(names)):
         main_sheet.set_row(row_index, None, None, {'hidden': True})
@@ -67,7 +66,7 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
 
     disclaimer_lines = [
         "Please try to avoid copy-pasting in areas with dropdowns, as this will break the underlying data validation and make subsequent editing difficult.",
-        "Only do so if you are sure you won't have to change the author name or affiliations afterwards, e.g. when pasting from identical sections in previous entries."
+        "Only do so if you are sure you won't have to change the author name or affiliations afterwards, e.g. when pasting from identical sections from previous entries."
     ]
 
     disclaimer_start_row = len(names) + 1
@@ -85,9 +84,9 @@ def create_sheet(file_path, names_affiliations, column_details, n_authors, prefi
     start_row = header_row + len(disclaimer_lines) - 1
     names_sheet.write('A1', 'Names')
     names_sheet.write('B1', 'Affiliations')
-    for row_index, name in enumerate(names, start=1):
-        names_sheet.write(row_index, 0, name)
-        for col_index, affiliation in enumerate(affiliations[name], start=1):
+    for row_index, (first_name, last_name) in enumerate(names, start=1):
+        names_sheet.write(row_index, 0, first_name + ' ' + last_name)
+        for col_index, affiliation in enumerate(affiliations_by_name_pubman[(first_name, last_name)], start=1):
             names_sheet.write(row_index, col_index, affiliation)
 
     for entry_idx in range(n_entries):
