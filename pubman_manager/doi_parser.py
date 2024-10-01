@@ -9,13 +9,13 @@ import yaml
 from fuzzywuzzy import process
 import requests
 import unicodedata
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 import os
 import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from pubman_manager import create_sheet, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
+from pubman_manager import create_sheet, Cell, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None, logging_level = logging.INFO):
@@ -29,7 +29,6 @@ class DOIParser:
         for author, author_info in self.affiliations_by_name_pubman.items():
             for affiliation in author_info['affiliations']:
                 if 'Max-Planck' in affiliation:
-                    print("affiliation",affiliation)
                     mpi_affiliation_counter[affiliation]+=1
         self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.crossref_metadata_map = {}
@@ -81,8 +80,6 @@ class DOIParser:
         if response.status_code == 200:
             author_data = response.json()
             preferred_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
-            print("preferred_name.get('given-name', '')",preferred_name.get('given-name', ''))
-            print("preferred_name.get('surname', '')",preferred_name.get('surname', ''))
             if '.' in (first_name:=preferred_name.get('given-name', '').split()[0]):
                 name_variants = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('name-variant', [])
                 if isinstance(name_variants, list):
@@ -320,7 +317,7 @@ class DOIParser:
                     'affiliation': affiliation,
                     'color': 'green',
                     'compare_error': compare_error,
-                    'comment': 'High confidence match from database.'
+                    'comment': f'High confidence match from database. err={compare_error}'
                 }
             return {
                 'affiliation': process_scopus_affiliation(proposed_affiliation),
@@ -339,7 +336,7 @@ class DOIParser:
             processed_affiliations[author] = []
 
             for proposed_affiliation in affiliations if affiliations else []:
-                print(f"Processing author: {author}")
+                print(f"Processing author: {author}", proposed_affiliation)
                 pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
                 if pubman_author_affiliations:
                     print(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check:", is_mpi_affiliation(proposed_affiliation))
@@ -366,7 +363,7 @@ class DOIParser:
 
                 processed_affiliations[author].append(affiliation_info)
 
-                if affiliation_info['color'] != 'gray' and is_mpi_affiliation(affiliation_info['affiliation']):
+                if is_mpi_affiliation(affiliation_info['affiliation']):
                     mpi_groups[affiliation_info['affiliation']] += 1
 
         print("MPI groups:", mpi_groups)
@@ -387,7 +384,7 @@ class DOIParser:
                         'affiliation': similar_affiliation,
                         'color': 'yellow' if score > 95 else 'red',
                         'compare_error': compare_error,
-                        'comment': 'Resolved ambiguous MPI affiliation using most common group.'
+                        'comment': f'Resolved ambiguous MPI affiliation using most common group. err={compare_error}'
                     }
                 elif affiliation == 'MISSING MPI':
                     processed_affiliations[author][i] = {
@@ -557,7 +554,7 @@ class DOIParser:
         ------
 
         Each entry in the result list is a dict that corresponds to a publication.
-        The dict maps column data to a tuple, e.g. `"Title": [title, 35, '']`
+        The dict maps column data to a tuple, e.g. `"Title": [title, 35)`
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
         new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
@@ -601,32 +598,36 @@ class DOIParser:
             # if copyright:
             #     copyright = copyright[0]
 
+            # Preparing data to place in table. For flexibility, specify column width and comment alongside
             prefill_publication = OrderedDict({
-                "Title": [title, 35, ''],
-                # "Type": [data.get('type'), 15, ''],
-                "Journal Title": [journal_title, 25, ''],
-                "Publisher": [html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20, ''],
-                "Issue": [crossref_metadata.get('issue', None), 10, ''],
-                "Volume": [crossref_metadata.get('volume', None), 10, ''],
-                "Page": [page, 10, ''],
-                'Article Number': [article_number, 10, ''],
-                "ISSN": [html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15, ''],
-                "Date created": [self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, ''],
-                # 'Date issued': [self.parse_date(.get('issued', {}).get('date-parts', [[None]])[0]), 20, ''],
-                'Date published': [self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20, ''],
-                'DOI': [doi, 20, ''],
-                # 'License type': [license_type, 15, ''],
-                'License url': [license_url, 20, ''] if license_type=='open' else ['', 20, ''],
-                'License year': [license_year, 15, ''] if license_type=='open' else ['', 15, ''],
-                'Pdf found': ['' if license_type=='closed' else 'y' if pdf_found else 'n', 15, ''],
-                'Link': [crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20, ''],
-                # 'Copyright': [copyright, 15, '']
+                "Title": Cell(title, 35),
+                # "Type": Cell(data.get('type'), 15),
+                "Journal Title": Cell(journal_title, 25),
+                "Publisher": Cell(html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20),
+                "Issue": Cell(crossref_metadata.get('issue', None), 10),
+                "Volume": Cell(crossref_metadata.get('volume', None), 10),
+                "Page": Cell(page, 10),
+                'Article Number': Cell(article_number, 10),
+                "ISSN": Cell(html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15),
+                "Date created": Cell(self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20),
+                # 'Date issued': Cell(self.parse_date(.get('issued', {}).get('date-parts', [[None]])[0]), 20),
+                'Date published': Cell(self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20),
+                'DOI': Cell(doi, 20),
+                # 'License type': Cell(license_type, 15),
+                'License url': Cell(license_url if license_type=='open' else '', 20),
+                'License year': Cell(license_year if license_type=='open' else '', 15),
+                'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15),
+                'Link': Cell(crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20),
+                # 'Copyright': Cell(copyright, 15)
             })
             i = 1
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
                 for affiliation_info in affiliations_info:
-                    prefill_publication[f"Author {i}"] = [first_name + ' ' + last_name, None, '']
-                    prefill_publication[f"Affiliation {i}"] = [affiliation_info['affiliation'], affiliation[1], '', affiliation[2]]
+                    prefill_publication[f"Author {i}"] = Cell(first_name + ' ' + last_name)
+                    prefill_publication[f"Affiliation {i}"] = Cell(affiliation_info['affiliation'],
+                                                                   color = affiliation_info['color'],
+                                                                   compare_error = affiliation_info['compare_error'],
+                                                                   comment = affiliation_info['comment'])
                     i = i+1
             dois_data.append(prefill_publication)
         return dois_data
@@ -640,9 +641,9 @@ class DOIParser:
         else:
             n_authors = 45
             column_details = OrderedDict({
-                key: [val[1], val[2]]
-                for key, val in dois_data[0].items()
-                if 'Author ' not in key and 'Affiliation ' not in key
+                header: [cell.width, cell.comment]
+                for header, cell in dois_data[0].items()
+                if 'Author ' not in header and 'Affiliation ' not in header
             })
             create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
                         column_details, n_authors,

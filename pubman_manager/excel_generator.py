@@ -1,6 +1,21 @@
 import xlsxwriter
 from collections import OrderedDict
 
+class Cell:
+    def __init__(self, data, width=None, color='', comment='', compare_error=None):
+        self.data = data
+        self.width = width
+        self.color = color
+        self.comment = comment
+        self.compare_error = compare_error
+
+    def __str__(self):
+        return f"Cell(data={self.data}, color={self.color}, comment={self.comment}, compare_error={self.compare_error})"
+
+    def __repr__(self):
+        return str(self)
+
+
 def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided to determine the number of rows.")
@@ -41,15 +56,6 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
         'purple': '#e6e6fa',
         'pink': '#FFEEEE',
         'green': '#ccffcc'
-    }
-
-    color_messages = {
-        'gray': 'Author or similar Affiliation not found in database -> using affiliation from publisher (err={err})',
-        'yellow': 'Author found in database -> using most similar affiliation to the one provided by the publisher (err={err})',
-        'orange': 'Author found in database, but no affiliation provided by publisher -> guessing affiliation based on publication title (err={err})',
-        'red': 'Author not found in database, no affiliation provided by publisher -> guessing based on other author affiliations (needs revision)',
-        'purple': 'Generic Max Planck Affiliation was provided by publisher, but the precise group was not found in the database (err={err})',
-        'pink': 'Author or similar Affiliation not found in database -> using most likely affiliation from other authors (err={err})'
     }
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}
@@ -122,13 +128,9 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
                 'input_message': affiliation_explanation,
                 'error_type': 'warning'
             })
-            affiliation_tooltip = ''
             if prefill_publications and entry_idx > 0:
-                publication_color = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', [None, None, ''])[1]
-                compare_error = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', [None, None, '', ''])[3]
-                if publication_color in color_messages:
-                    affiliation_tooltip = color_messages[publication_color].format(err=compare_error)
-                main_sheet.write_comment(start_row + entry_idx, affiliation_col, affiliation_tooltip)
+                comment = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', Cell('')).comment
+                main_sheet.write_comment(start_row + entry_idx, affiliation_col, comment)
 
     entry_number_col = list(col_layout.keys()).index('Entry Number')
     for entry_idx in range(n_entries):
@@ -140,9 +142,9 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
             for col_index, header in enumerate(col_layout.keys()):
                 if header in publication:
                     if publication[header]:
-                        if not (cell_value := publication[header][0]):
+                        if not (cell_value := publication[header].data):
                             cell_value = ''
-                        main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header][1], wrap_format))
+                        main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header].color, wrap_format))
     else:
         for entry_idx in range(n_entries):
             for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
