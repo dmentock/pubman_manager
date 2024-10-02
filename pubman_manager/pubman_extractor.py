@@ -25,6 +25,8 @@ class PubmanExtractor(PubmanBase):
         """
         reduced_affiliations = []
         for affiliation in affiliation_list:
+            if '_' in affiliation or 'x0' in affiliation:
+                continue
             affiliation = affiliation.strip()
             found_similar = False
             for reduced_affiliation in reduced_affiliations:
@@ -46,41 +48,46 @@ class PubmanExtractor(PubmanBase):
                 person = creator.get('person', {})
                 given_name = person.get('givenName', '')
                 family_name = person.get('familyName', '')
-                full_name = f"{given_name} {family_name}".strip()
-                organizations = person.get('organizations', [])
-                affiliation_list = self.process_affiliations([org['name'] for org in organizations])
-                if full_name not in authors_info:
-                    authors_info[full_name] = {}
-                if 'affiliations' in authors_info[full_name]:
-                    authors_info[full_name]['affiliations'].update(affiliation_list)
-                else:
-                    authors_info[full_name]['affiliations'] = set(affiliation_list)
-                if (identifier := person.get('identifier')) and 'identifier' not in authors_info[full_name]:
-                    authors_info[full_name]['identifier'] = identifier
+                # Entries like 'Materials Science International Team, MSIT®' have no first name, ignore
+                if given_name and family_name:
+                    organizations = person.get('organizations', [])
+                    affiliation_list = self.process_affiliations([org['name'] for org in organizations])
+                    if (full_name:=(given_name, family_name)) not in authors_info:
+                        authors_info[full_name] = {}
+                    if 'affiliations' in authors_info[full_name]:
+                        authors_info[full_name]['affiliations'].update(affiliation_list)
+                    else:
+                        authors_info[full_name]['affiliations'] = set(affiliation_list)
+                    if (identifier := person.get('identifier')) and 'identifier' not in authors_info[full_name]:
+                        authors_info[full_name]['identifier'] = identifier
 
+        to_remove = []
         for author in authors_info:
-            if 'affiliations' in authors_info[author]:
-                authors_info[author]['affiliations'] = list(authors_info[author]['affiliations'])
+            if '.' in author[0]:
+                if len(author[0].split()[0])<=2:
+                    for author_ in authors_info:
+                        if len(author[0]) > 2 and author_[1] == author[1] and author[0][0] == author_[0][0]:
+                            to_remove.append(author)
+                elif (author[0].split()[0], author[1]) in authors_info:
+                    to_remove.append(author)
+        for author in set(to_remove):
+            del authors_info[author]
 
         full_names = set()
-        abbreviated_names = []
-
+        abbreviated_names = set()
         for name in authors_info.keys():
-            if '.' not in name.split()[0]:
+            if '.' not in name[0].split()[0]:
                 full_names.add(name)
             else:
-                abbreviated_names.append(name)
-        def has_full_name_equivalent(abbreviated, full_names):
-            abbrev_parts = abbreviated.split()
-            abbrev_initials = [part[0] for part in abbrev_parts if '.' in part]
-
+                abbreviated_names.add(name)
+        for abbreviated_name in abbreviated_names:
             for full_name in full_names:
-                full_name_parts = full_name.split()
-                if len(full_name_parts) >= len(abbrev_initials) and all(full_name_parts[i][0] == abbrev_initials[i] for i in range(len(abbrev_initials))):
-                    return True
-            return False
-        return {name: affiliations for name, affiliations in authors_info.items()
-                 if not ('.' in name.split()[0] and has_full_name_equivalent(name, full_names))}
+                if abbreviated_name[1] == full_name[1]:
+                    if (not '.' in abbreviated_name[0].split()[0] and abbreviated_name[0].split()[0] == full_name[0].split()[0]) or \
+                       ('.' in abbreviated_name[0].split()[0] and abbreviated_name[0].split()[0][0] == full_name[0].split()[0][0]):
+                      authors_info.pop(abbreviated_name)
+                      break
+        return authors_info
 
     def extract_journal_names(self, publications):
         journals = {}

@@ -16,11 +16,11 @@ class PubmanCreator(PubmanBase):
     def __init__(self, username=None, password=None, base_url = "https://pure.mpg.de/rest"):
         super().__init__(username=username, password=password, base_url=base_url)
         with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'r') as f:
-            self.identifier_paths = yaml.safe_load(f)
+            self.identifier_paths = yaml.load(f, Loader=yaml.FullLoader)
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r') as f:
-            self.authors_info = yaml.safe_load(f)
+            self.authors_info = yaml.load(f, Loader=yaml.FullLoader)
         with open(PUBMAN_CACHE_DIR / 'journals.yaml', 'r') as f:
-            self.journals = yaml.safe_load(f)
+            self.journals = yaml.load(f, Loader=yaml.FullLoader)
 
     def parse_excel_table(self, file_path):
         def find_header_row(df):
@@ -40,27 +40,31 @@ class PubmanCreator(PubmanBase):
         df = df_data.iloc[start_row - header_row - 1:end_row - header_row]
         return df
 
-    def get_authors_info(self, row):
-        authors_info = OrderedDict()
+    def get_row_authors_info(self, row):
+        row_authors = OrderedDict()
+        authors_info_merged_names = {f'{first_name} {last_name}': affiliations for (first_name, last_name), affiliations in self.authors_info.items()}
         for i in range(1, 50):  # TODO: make scalable
             author_name_key = f'Author {i}'
             affiliation_key = f'Affiliation {i}'
             if author_name_key in row and affiliation_key in row:
                 if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                    if row[author_name_key] not in authors_info:
-                        if identifier:=self.authors_info.get(row[author_name_key],{}).get('identifier'):
-                            authors_info[row[author_name_key]] = {'identifier': identifier}
+                    if row[author_name_key] not in row_authors:
+                        if identifier:=authors_info_merged_names.get(row[author_name_key],{}).get('identifier'):
+                            row_authors[row[author_name_key]] = {'identifier': identifier}
                         else:
-                            authors_info[row[author_name_key]] = {}
-                    if 'affiliations' not in authors_info[row[author_name_key]]:
-                        authors_info[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
+                            row_authors[row[author_name_key]] = {}
+                    if 'affiliations' not in row_authors[row[author_name_key]]:
+                        row_authors[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
                     else:
-                        authors_info[row[author_name_key]]['affiliations'].append(row[affiliation_key])
-        return authors_info
+                        row_authors[row[author_name_key]]['affiliations'].append(row[affiliation_key])
+        return row_authors
 
     def safe_date_parse(self, date_str):
         try:
-            parsed_date = parser.parse(date_str, fuzzy=True)
+            if '-' in date_str:
+                parsed_date = parser.parse(date_str, fuzzy=True)
+            else:
+                parsed_date = parser.parse(date_str, fuzzy=True, dayfirst=True)
             parts = date_str.split('-') if '-' in date_str else date_str.split('.')
             if len(parts) == 1:
                 return parsed_date.replace(month=1, day=1)
@@ -92,9 +96,9 @@ class PubmanCreator(PubmanBase):
 
         for index, row in df.iterrows():
             self.log.info(f"Generating requests for \"{row.get('Talk Title')}\"")
-            authors_info = self.get_authors_info(row)
+            row_authors_info = self.get_row_authors_info(row)
             metadata_creators = []
-            for author, info in authors_info.items():
+            for author, info in row_authors_info.items():
                 given_name, family_name = author.split(' ', 1)
                 affiliation_list = []
                 for affiliation in info['affiliations']:
@@ -199,10 +203,10 @@ class PubmanCreator(PubmanBase):
             title = row.get('Title')
             if not title:
                 raise RuntimeError(f"Missing entry for row {index}")
-            authors_info = self.get_authors_info(row)
+            row_authors_info = self.get_row_authors_info(row)
 
             metadata_creators = []
-            for author, info in authors_info.items():
+            for author, info in row_authors_info.items():
                 given_name, family_name = author.split(' ', 1)
                 affiliation_list = []
                 for affiliation in info['affiliations']:
@@ -231,19 +235,17 @@ class PubmanCreator(PubmanBase):
                 })
             doi = str(row.get("DOI"))
 
-            date_created_sheet = row.get('Date created')
-            date_created_parsed = self.safe_date_parse(str(date_created_sheet)) if date_created_sheet else None
-            date_created = self.format_date(date_created_parsed, date_created_sheet) if date_created_parsed else None
-
             date_issued_sheet = str(row.get('Date issued'))
             date_issued_parsed = self.safe_date_parse(str(date_issued_sheet)) if date_issued_sheet else None
-            date_issued = self.format_date(date_issued_parsed, date_issued_sheet) if date_issued_parsed else \
-                          self.format_date(date_created_parsed, '') if date_created_parsed else None
+            date_issued = self.format_date(date_issued_parsed, date_issued_sheet) if date_issued_parsed else None
 
-            date_published_sheet = str(row.get('Date published'))
+            date_published_sheet = str(row.get('Date published online'))
             date_published_parsed = self.safe_date_parse(str(date_published_sheet)) if date_published_sheet else None
-            date_published = self.format_date(date_published_parsed, date_published_sheet) if date_published_parsed else None
+            date_published_online = self.format_date(date_published_parsed, date_published_sheet) if date_published_parsed else None
 
+            # print("date_published_online",date_published_online_sheet, date_published_online)
+            # print("date_issued",date_issued_sheet, date_issued_parsed, date_issued)
+            # print("date_published",date_published_sheet, date_published_parsed, date_published)
             identifiers = self.journals.get(row.get('Journal Title', ''), {}).get('identifiers', {})
             issn = row.get('ISSN')
             if 'ISSN' not in identifiers and issn:
@@ -260,7 +262,7 @@ class PubmanCreator(PubmanBase):
                 "genre": self.journals.get(row.get('Journal Title', ''), {}).get('genre', 'JOURNAL'),
                 "title": row.get('Journal Title'),
                 "publishingInfo":  self.journals.get(row.get('Journal Title', ''), {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
-                "volume": int(row.get('Volume')) if row.get('Volume') and str(row.get('Volume')) != 'nan' else '',
+                "volume": str(int(row.get('Volume'))) if row.get('Volume') and str(row.get('Volume')) != 'nan' else '',
                 "issue": issue,
                 "identifiers": identifiers_list,
             }]
@@ -275,49 +277,52 @@ class PubmanCreator(PubmanBase):
 
             files = []
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
-            if row.get('License url') and pdf_path.exists():
-                file_id = self.upload_pdf(pdf_path)
-                file =  {
-                    "objectId": '',
-                    "name": pdf_path.name,
-                    "lastModificationDate" : "",
-                    "creationDate" : "",
-                    "creator" : {
-                      "objectId" : ""
-                    },
-                    "pid" : "",
-                    'content': file_id,
-                    "visibility": "PUBLIC",
-                    "contentCategory": "publisher-version",
-                    "checksum" : "",
-                    "checksumAlgorithm" : "MD5",
-                    "mimeType" : "",
-                    "size" : 0,
-                    'storage': 'INTERNAL_MANAGED',
-                    "metadata" : {
-                      "title" : pdf_path.name,
-                      "description" : "File downloaded from scopus",
-                      "formats" : [ {
-                        "value" : "",
-                        "type" : ""
-                      } ],
-                      "size" : 0,
-                    },
-                }
-                license_url = row.get('License url', '')
-                license_year = row.get('License year', '')
-                if (license_url and not isinstance(license_url, float)) or (isinstance(license_url, float) and not math.isnan(license_url)):
-                    file['metadata']['license'] = license_url
+            if row.get('License url') and not pd.isna(row.get('License url')):
+                if not pdf_path.exists():
+                    raise RuntimeError(f'PDF for DOI {doi} not found in {pdf_path}')
                 else:
-                    license_url = ''
-                if license_year and license_year!=license_year:
-                    try:
-                        license_year = str(int(license_year))
-                        file['metadata']['copyrightDate'] = license_year
-                    except:
-                        pass
-                file['metadata']['contentCategory'] = 'pre-print' if 'arxiv' in license_url else 'publisher-version'
-                files.append(file)
+                  file_id = self.upload_pdf(pdf_path)
+                  file =  {
+                      "objectId": '',
+                      "name": pdf_path.name,
+                      "lastModificationDate" : "",
+                      "creationDate" : "",
+                      "creator" : {
+                        "objectId" : ""
+                      },
+                      "pid" : "",
+                      'content': file_id,
+                      "visibility": "PUBLIC",
+                      "contentCategory": "publisher-version",
+                      "checksum" : "",
+                      "checksumAlgorithm" : "MD5",
+                      "mimeType" : "",
+                      "size" : 0,
+                      'storage': 'INTERNAL_MANAGED',
+                      "metadata" : {
+                        "title" : pdf_path.name,
+                        "description" : "File downloaded from scopus",
+                        "formats" : [ {
+                          "value" : "",
+                          "type" : ""
+                        } ],
+                        "size" : 0,
+                      },
+                  }
+                  license_url = row.get('License url', '')
+                  license_year = row.get('License year', '')
+                  if (license_url and not isinstance(license_url, float)) or (isinstance(license_url, float) and not math.isnan(license_url)):
+                      file['metadata']['license'] = license_url
+                  else:
+                      license_url = ''
+                  if license_year and license_year!=license_year:
+                      try:
+                          license_year = str(int(license_year))
+                          file['metadata']['copyrightDate'] = license_year
+                      except:
+                          pass
+                  file['metadata']['contentCategory'] = 'pre-print' if 'arxiv' in license_url else 'publisher-version'
+                  files.append(file)
 
             request = {
                 "context": {
@@ -339,9 +344,9 @@ class PubmanCreator(PubmanBase):
                 "metadata": {
                     "title": row.get('Title'),
                     "creators": metadata_creators,
-                    "dateCreated": date_created,
+                    "dateCreated": date_published_online,
                     "datePublishedInPrint": date_issued,
-                    "datePublishedOnline": date_published,
+                    "datePublishedOnline": date_published_online ,
                     "genre": 'ARTICLE',
                     "identifiers": [
                         {"id": doi, "type": "DOI"},

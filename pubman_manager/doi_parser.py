@@ -89,8 +89,7 @@ class DOIParser:
                             break
             return first_name, preferred_name.get('surname', '')
         else:
-            self.log.error(f"Unable to retrieve author data for author {author_id} (status code: {response.status_code}, {response.text}")
-            return None
+            raise RuntimeError(f"Unable to retrieve author data for author {author_id} (status code: {response.status_code}, {response.text}")
 
     def extract_scopus_authors_affiliations(self, scopus_metadata) -> OrderedDict[str, List[str]]:
         """
@@ -143,7 +142,6 @@ class DOIParser:
                 if author_id:
                     first_name, surname = self.get_scopus_author_full_name(author_id)
             full_name = self.process_name(self.affiliations_by_name_pubman.keys(), first_name, surname)
-            # print("full_name",full_name)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
@@ -168,6 +166,8 @@ class DOIParser:
         raise RuntimeError
 
     def process_name(self, pubman_names, first_name, surname):
+        """ Hierarchical approach to match Scopus author names with PuRe author names"""
+
         def normalize_name_for_comparison(name):
             name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8').strip()
             return ''.join(name.lower().replace('.', '').replace('-', '').split()).strip()
@@ -268,19 +268,17 @@ class DOIParser:
             first_name_no_middle = first_name.split()[0]
             return first_name_no_middle, surname
 
+    def is_mpi_affiliation(self, affiliation: str) -> bool:
+        """Check if the affiliation belongs to the Max-Planck Institute."""
+        return any(keyword in affiliation for keyword in ['Max Planck', 'Max Plank']) or \
+               any(keyword in affiliation.replace(' ', '') for keyword in ['Max-Planck'])
+
+
     def process_author_list(self, affiliations_by_name: Dict[str, List[str]], title: str) -> Dict[str, List[Dict[str, Any]]]:
         """
         Go over list of authors and affiliations from Scopus, compare to PuRe entries,
         and possibly adopt PuRe if differences are small.
         """
-        print("process_author_list", affiliations_by_name)
-
-        from collections import Counter
-        from fuzzywuzzy import process  # Assuming you have this import elsewhere
-
-        def is_mpi_affiliation(affiliation: str) -> bool:
-            """Check if the affiliation belongs to the Max-Planck Institute."""
-            return any(keyword in affiliation for keyword in ['Max-Planck', 'Max Planck', 'Max Plank'])
 
         def process_scopus_affiliation(affiliation: str) -> str:
             """Format Scopus affiliation string."""
@@ -288,9 +286,7 @@ class DOIParser:
 
         def handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations):
             """Handle MPI affiliation processing."""
-            pubman_mpi_groups = [aff for aff in pubman_author_affiliations if is_mpi_affiliation(aff)]
-            print(f"Pubman MPI groups for {author}: {pubman_mpi_groups}")
-
+            pubman_mpi_groups = [aff for aff in pubman_author_affiliations if self.is_mpi_affiliation(aff)]
             if len(pubman_mpi_groups) == 1:
                 mpi_groups[pubman_mpi_groups[0]] += 1
                 return {
@@ -328,26 +324,21 @@ class DOIParser:
         mpi_groups = Counter()
         processed_affiliations = {}
         ambiguous_mpi_affiliations = {}
-
-        print("self.mpi_affiliations", self.mpi_affiliations)
-
-        # Process each author and their affiliations
         for author, affiliations in affiliations_by_name.items():
             processed_affiliations[author] = []
-
             for proposed_affiliation in affiliations if affiliations else []:
-                print(f"Processing author: {author}", proposed_affiliation)
+                self.log.debug(f"Processing author: {author}: {proposed_affiliation}")
                 pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
                 if pubman_author_affiliations:
-                    print(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check:", is_mpi_affiliation(proposed_affiliation))
+                    self.log.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check:", self.is_mpi_affiliation(proposed_affiliation))
 
-                    if is_mpi_affiliation(proposed_affiliation):
+                    if self.is_mpi_affiliation(proposed_affiliation):
                         affiliation_info = handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations)
                     else:
                         affiliation_info = handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations)
                 elif proposed_affiliation.strip():
-                    print(f"No PuRe affiliation for {author}, but provided by Scopus: {proposed_affiliation}")
-                    if is_mpi_affiliation(proposed_affiliation):
+                    self.log.debug(f"No PuRe affiliation for {author}, but provided by Scopus: {proposed_affiliation}")
+                    if self.is_mpi_affiliation(proposed_affiliation):
                         affiliation_info = {
                             'affiliation': 'MISSING MPI',
                         }
@@ -363,21 +354,21 @@ class DOIParser:
 
                 processed_affiliations[author].append(affiliation_info)
 
-                if is_mpi_affiliation(affiliation_info['affiliation']):
+                if self.is_mpi_affiliation(affiliation_info['affiliation']):
                     mpi_groups[affiliation_info['affiliation']] += 1
 
-        print("MPI groups:", mpi_groups)
+        self.log.debug(f"MPI groups: {mpi_groups}")
         most_common_mpi_group = mpi_groups.most_common(1)[0][0] if mpi_groups else self.mpi_affiliations[0]
-        print("Most common MPI group:", most_common_mpi_group)
+        self.log.debug(f"Most common MPI group: {most_common_mpi_group}")
 
         # Resolve ambiguous MPI affiliations and assign missing MPI groups
         for author, affiliations in processed_affiliations.items():
             for i, affiliation_info in enumerate(affiliations):
                 affiliation = affiliation_info['affiliation']
-                print(f"Author: {author}, Current affiliation: {affiliation}")
+                self.log.debug(f"Author: {author}, Current affiliation: {affiliation}")
 
                 if affiliation == 'AMBIGUOUS MPI':
-                    print(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
+                    self.log.debug(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
                     similar_affiliation, score = process.extractOne(most_common_mpi_group, ambiguous_mpi_affiliations[author])
                     compare_error = (100 - score) / 100
                     processed_affiliations[author][i] = {
@@ -401,19 +392,24 @@ class DOIParser:
         Download PDF for given DOI with Scopus API
         """
 
-        self.log.debug(f"Attempting to download PDF for DOI: {doi}")
-        self.log.debug(f"PDF link: {pdf_link}")
-        if pdf_link is None:
-            self.log.error(f"No valid PDF link found for DOI: {doi}")
+        pdf_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
+        if pdf_path.exists():
+            self.log.debug(f'Pdf path {pdf_path} already exists, skipping...')
+            return True
         else:
-            response = requests.get(pdf_link, stream=True)
-            if response.status_code == 200:
-                with open(FILES_DIR / f'{doi.replace("/", "_")}.pdf', 'wb') as f:
-                    for chunk in response.iter_content(1024):
-                        f.write(chunk)
-                return True
+            self.log.debug(f"Attempting to download PDF for DOI: {doi}")
+            self.log.debug(f"PDF link: {pdf_link}")
+            if pdf_link is None:
+                self.log.error(f"No valid PDF link found for DOI: {doi}")
             else:
-                self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
+                response = requests.get(pdf_link, stream=True)
+                if response.status_code == 200:
+                    with open(pdf_path, 'wb') as f:
+                        for chunk in response.iter_content(1024):
+                            f.write(chunk)
+                    return True
+                else:
+                    self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
         return False
 
     def get_dois_for_author(self,
@@ -499,15 +495,15 @@ class DOIParser:
                 field.append('Publication not found on Scopus')
             else:
                 author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
-                print("author_affiliation_map",author_affiliation_map)
                 is_mp_publication = False
                 for _, affiliations in author_affiliation_map.items():
-                    # print(_)
                     for affiliation in affiliations:
-                        # print(affiliation)
                         # Scopus sometimes has a Max Plank typo
-                        if 'Max-Planck' in affiliation.replace(' ', '') or 'Max Planck' in affiliation or 'Max Plank' in affiliation:
+                        if self.is_mpi_affiliation(affiliation):
                             is_mp_publication = True
+                            break
+                    if is_mp_publication:
+                        break
                 if not is_mp_publication:
                     field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
 
@@ -529,7 +525,7 @@ class DOIParser:
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
         results = []
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=1) as executor:
             futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
             for future in as_completed(futures):
                 result = future.result()
@@ -590,18 +586,14 @@ class DOIParser:
             if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
                 license_type = 'open'
                 pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
-            # else:
-            #     affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
+
+            date_issued_scopus = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['source']['publicationdate']
+            date_issued = (f"{date_issued_scopus.get('day', '').zfill(2)}." if date_issued_scopus.get('day') else "") + \
+                          (f"{date_issued_scopus.get('month', '').zfill(2)}." if date_issued_scopus.get('month') else "") + \
+                          (date_issued_scopus.get('year', '') ).rstrip('.')
             cleaned_author_list = self.process_author_list(affiliations_by_name, title)
-
-            # copyright = [assertion for assertion in crossref_metadata.get('assertion', []) if assertion.get('name') == 'copyright']
-            # if copyright:
-            #     copyright = copyright[0]
-
-            # Preparing data to place in table. For flexibility, specify column width and comment alongside
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
-                # "Type": Cell(data.get('type'), 15),
                 "Journal Title": Cell(journal_title, 25),
                 "Publisher": Cell(html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20),
                 "Issue": Cell(crossref_metadata.get('issue', None), 10),
@@ -609,16 +601,13 @@ class DOIParser:
                 "Page": Cell(page, 10),
                 'Article Number': Cell(article_number, 10),
                 "ISSN": Cell(html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15),
-                "Date created": Cell(self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20),
-                # 'Date issued': Cell(self.parse_date(.get('issued', {}).get('date-parts', [[None]])[0]), 20),
-                'Date published': Cell(self.parse_date(crossref_metadata.get('published', {}).get('date-parts', [[None]])[0]), 20),
+                "Date published online": Cell(self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20),
+                'Date issued': Cell(date_issued, 20),
                 'DOI': Cell(doi, 20),
-                # 'License type': Cell(license_type, 15),
                 'License url': Cell(license_url if license_type=='open' else '', 20),
                 'License year': Cell(license_year if license_type=='open' else '', 15),
                 'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15),
                 'Link': Cell(crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20),
-                # 'Copyright': Cell(copyright, 15)
             })
             i = 1
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
