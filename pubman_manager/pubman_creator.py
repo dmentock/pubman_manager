@@ -90,6 +90,15 @@ class PubmanCreator(PubmanBase):
 
         return re.sub(pattern, '', affiliation)
 
+    def clean_scalar(self, scalar):
+        if not scalar or pd.isna(scalar):
+            return ''
+        try:
+            scalar = int(scalar)
+        except:
+            pass
+        return str(scalar)
+
     def create_talks(self, file_path, create_items=True, submit_items=False, overwrite=False):
         df = self.parse_excel_table(file_path)
         request_list = []
@@ -243,41 +252,32 @@ class PubmanCreator(PubmanBase):
             date_published_parsed = self.safe_date_parse(str(date_published_sheet)) if date_published_sheet else None
             date_published_online = self.format_date(date_published_parsed, date_published_sheet) if date_published_parsed else None
 
-            # print("date_published_online",date_published_online_sheet, date_published_online)
-            # print("date_issued",date_issued_sheet, date_issued_parsed, date_issued)
-            # print("date_published",date_published_sheet, date_published_parsed, date_published)
-            identifiers = self.journals.get(row.get('Journal Title', ''), {}).get('identifiers', {})
-            issn = row.get('ISSN')
-            if 'ISSN' not in identifiers and issn:
-                if isinstance(issn, float) and math.isnan(issn):
-                    issn = ''
-                identifiers['ISSN'] = issn
 
+            identifiers = self.journals.get(row.get('Journal Title', ''), {}).get('identifiers', {})
+            identifiers['ISSN'] = self.clean_scalar(row.get('ISSN'))
             identifiers_list = [{'type': key, 'id': id} for key, id in
                                 identifiers.items()]
 
-            issue = str(row.get('Issue')) if row.get('Issue') and str(row.get('Issue')) != 'nan' else ''
             sources = [{
                 'alternativeTitles': self.journals.get(row.get('Journal Title', ''), {}).get('alternativeTitles', []),
                 "genre": self.journals.get(row.get('Journal Title', ''), {}).get('genre', 'JOURNAL'),
                 "title": row.get('Journal Title'),
-                "publishingInfo":  self.journals.get(row.get('Journal Title', ''), {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
-                "volume": str(int(row.get('Volume'))) if row.get('Volume') and str(row.get('Volume')) != 'nan' else '',
-                "issue": issue,
+                "publishingInfo": self.journals.get(row.get('Journal Title', ''), {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
+                "volume": self.clean_scalar(row.get('Volume')),
+                "issue": self.clean_scalar(row.get('Issue')),
                 "identifiers": identifiers_list,
             }]
-            if isinstance(row.get('Page'), str) and '-' in row.get('Page', '') and str(row.get('Page')) != 'nan':
-                sources[0]['startPage'] = row.get('Page').split('-')[0].strip()
-                sources[0]['endPage'] = row.get('Page').split('-')[-1].strip()
-                sources[0]['totalNumberOfPages'] = int(row.get('Page').split('-')[-1].strip()) - \
-                          int(row.get('Page').split('-')[0].strip()) + 1
-            article_number = row.get('Article Number')
-            if article_number and not math.isnan(article_number):
-                sources[0]['sequenceNumber'] = int(article_number)
+            if page:=self.clean_scalar(row['Page']):
+                sources[0]['startPage'] = page.split('-')[0].strip()
+                sources[0]['endPage'] = page.split('-')[-1].strip()
+                sources[0]['totalNumberOfPages'] = int(page.split('-')[-1].strip()) - \
+                          int(page.split('-')[0].strip()) + 1
+            if article_number:=self.clean_scalar(row.get('Article Number')):
+                sources[0]['sequenceNumber'] = article_number
 
             files = []
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
-            if row.get('License url') and not pd.isna(row.get('License url')):
+            if self.clean_scalar(row.get('License url')):
                 if not pdf_path.exists():
                     raise RuntimeError(f'PDF for DOI {doi} not found in {pdf_path}')
                 else:

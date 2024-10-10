@@ -1,5 +1,5 @@
 import xlsxwriter
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 
 class Cell:
     def __init__(self, data, width=None, color='', comment='', compare_error=None):
@@ -34,8 +34,36 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
         col_layout[f'Helper {i + 1}'] = (10, '')
 
     workbook = xlsxwriter.Workbook(file_path)
+
     main_sheet = workbook.add_worksheet("MainSheet")
+
     names_sheet = workbook.add_worksheet("Names")
+    names = list(affiliations_by_name_pubman.keys())
+    for row_index, (first_name, last_name) in enumerate(names):
+        for col_index in range(n_authors):
+            col = list(col_layout.keys()).index(f'Author {col_index + 1}')
+            main_sheet.write(row_index, col, first_name + ' ' + last_name)
+    for row_index in range(len(names)):
+        main_sheet.set_row(row_index, None, None, {'hidden': True})
+
+    # mpi_authors_sheet = workbook.add_worksheet("MPI_Authors")
+    mpi_affiliations_sheet = workbook.add_worksheet("MPI_Affiliations")
+    mpi_affiliations = Counter()
+    # mpi_authors = set()
+    for (first_name, last_name) in names:
+        for affiliation in affiliations_by_name_pubman[(first_name, last_name)]:
+            if any(keyword in affiliation for keyword in ['Max Planck', 'Max-Planck']):
+                mpi_affiliations[affiliation] += 1
+                # mpi_authors.add(f'{first_name} {last_name}')
+    # for row_index, name in enumerate(sorted(list(mpi_authors))):
+    #     mpi_authors_sheet.write(row_index, 0, name)
+    mpi_affiliations = [affiliation for affiliation, count in mpi_affiliations.most_common()]
+    for row_index, affiliation in enumerate(mpi_affiliations):
+        mpi_affiliations_sheet.write(row_index, 0, affiliation)
+    if len(mpi_affiliations) > 20:
+        mpi_affiliations = mpi_affiliations[:20]
+    for row_index, affiliation in enumerate(mpi_affiliations):
+        mpi_affiliations_sheet.write(row_index, 0, affiliation)
 
     header_format = workbook.add_format({'text_wrap': True, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'locked': True})
     italic_format = workbook.add_format({'italic': True, 'text_wrap': True, 'locked': True})
@@ -60,16 +88,6 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}
 
-    names = list(affiliations_by_name_pubman.keys())
-    for row_index, (first_name, last_name) in enumerate(names):
-        for col_index in range(n_authors):
-            col = list(col_layout.keys()).index(f'Author {col_index + 1}')
-            main_sheet.write(row_index, col, first_name + ' ' + last_name)
-
-    for row_index in range(len(names)):
-        main_sheet.set_row(row_index, None, None, {'hidden': True})
-
-
     disclaimer_lines = [
         "Please try to avoid copy-pasting in areas with dropdowns, as this will break the underlying data validation and make subsequent editing difficult.",
         "Only do so if you are sure you won't have to change the author name or affiliations afterwards, e.g. when pasting from identical sections from previous entries."
@@ -81,19 +99,21 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
             f'A{disclaimer_start_row + i}:{col_num_to_col_letter(len(col_layout))}{disclaimer_start_row + i}',
             line, disclaimer_format
         )
-    header_row = disclaimer_start_row + len(disclaimer_lines)
+    start_row = disclaimer_start_row + len(disclaimer_lines) + 2
+
     for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
-        main_sheet.write(header_row, col_index, header, header_format)
-        main_sheet.write(header_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
+        main_sheet.write(start_row, col_index, header, header_format)
+        main_sheet.write(start_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
         main_sheet.set_column(col_index, col_index, width)
 
-    start_row = header_row + len(disclaimer_lines) - 1
+    start_row = start_row + len(disclaimer_lines) - 1
     names_sheet.write('A1', 'Names')
     names_sheet.write('B1', 'Affiliations')
     for row_index, (first_name, last_name) in enumerate(names, start=1):
         names_sheet.write(row_index, 0, first_name + ' ' + last_name)
         for col_index, affiliation in enumerate(affiliations_by_name_pubman[(first_name, last_name)], start=1):
             names_sheet.write(row_index, col_index, affiliation)
+
 
     for entry_idx in range(n_entries):
         for i in range(n_authors):
@@ -128,6 +148,24 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
                 'input_message': affiliation_explanation,
                 'error_type': 'warning'
             })
+
+            if entry_idx == 0:
+                # main_sheet.data_validation(start_row - 3, name_col, start_row - 3, name_col, {
+                #     'validate': 'list',
+                #     'source': f'MPI_Authors!$A$1:$A${len(mpi_authors)+1}',
+                #     'input_message': 'Browse list of MPI Authors',
+                #     'error_type': 'warning'
+                # })
+                # main_sheet.write(start_row - 3, affiliation_col, '▼ MPI Authors')
+
+                main_sheet.data_validation(start_row - 3, affiliation_col, start_row - 3, affiliation_col, {
+                    'validate': 'list',
+                    'source': f'MPI_Affiliations!$A$1:$A${len(mpi_affiliations)+1}',
+                    'input_message': 'Browse list of MPI Affiliations',
+                    'error_type': 'warning'
+                })
+                main_sheet.write(start_row - 3, affiliation_col, '▼ Common MPI Affiliations')
+
             if prefill_publications and entry_idx > 0:
                 comment = prefill_publications[entry_idx-1].get(f'Affiliation {i + 1}', Cell('')).comment
                 main_sheet.write_comment(start_row + entry_idx, affiliation_col, comment)

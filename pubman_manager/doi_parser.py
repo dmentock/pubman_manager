@@ -14,6 +14,7 @@ import os
 import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
 
 from pubman_manager import create_sheet, Cell, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
@@ -142,6 +143,7 @@ class DOIParser:
                 if author_id:
                     first_name, surname = self.get_scopus_author_full_name(author_id)
             full_name = self.process_name(self.affiliations_by_name_pubman.keys(), first_name, surname)
+            print("fff", first_name, surname, full_name)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
@@ -166,107 +168,44 @@ class DOIParser:
         raise RuntimeError
 
     def process_name(self, pubman_names, first_name, surname):
-        """ Hierarchical approach to match Scopus author names with PuRe author names"""
+        """Match Scopus author names with PuRe author names, preserving formatting from the database."""
 
         def normalize_name_for_comparison(name):
-            name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8').strip()
-            return ''.join(name.lower().replace('.', '').replace('-', '').split()).strip()
-        def get_initials(name):
-            name_parts = name.replace('.', '').replace('-', ' ').split()
-            initials = ''.join([part[0] for part in name_parts if part])
-            return initials.lower().strip()
+            # Remove accents and convert to ASCII
+            name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8')
+            # Replace hyphens with spaces
+            name = name.replace('-', ' ')
+            # Handle camelCase names by inserting spaces before uppercase letters
+            name = re.sub('([a-z])([A-Z])', r'\1 \2', name)
+            # Remove dots
+            name = name.replace('.', '')
+            # Convert to lowercase
+            name = name.lower()
+            # Remove spaces to get a continuous string for comparison
+            name_normalized = ''.join(name.split())
+            return name_normalized
 
-        def get_name_parts(name):
-            return name.replace('.', '').replace('-', ' ').split()
-
-        def is_abbreviated(name):
-            return '.' in name
-
-        # Normalize incoming surname for comparison
+        # Normalize incoming surname and first name for comparison
         surname_normalized = normalize_name_for_comparison(surname)
         first_name_normalized = normalize_name_for_comparison(first_name)
-        first_name_initials = get_initials(first_name)
-        first_name_parts = get_name_parts(first_name)
-
-        best_match = None
-        best_matching_type = float('inf')
-        best_first_name_parts_count = float('inf')
-        best_has_middle_name = True  # We prefer names without middle names
-        best_has_abbreviation = True  # We prefer names without abbreviations
 
         for pubman_firstname, pubman_surname in pubman_names:
+            # Normalize names from the database for comparison
             pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
-
-            if surname_normalized != pubman_surname_normalized:
-                continue  # Surname does not match
-
             pubman_firstname_normalized = normalize_name_for_comparison(pubman_firstname)
-            pubman_firstname_initials = get_initials(pubman_firstname)
-            pubman_firstname_parts = get_name_parts(pubman_firstname)
 
-            matching_type = None
+            # Compare surnames and first names after normalization
+            if (surname_normalized == pubman_surname_normalized and
+                    first_name_normalized == pubman_firstname_normalized):
+                # Match found; return the original names from the database
+                return pubman_firstname, pubman_surname
 
-            if first_name_normalized == pubman_firstname_normalized:
-                matching_type = 0  # Exact match
-            elif first_name_initials == pubman_firstname_initials:
-                matching_type = 1  # Initials match
-            elif pubman_firstname_normalized.startswith(first_name_normalized):
-                matching_type = 2  # Incoming name is a prefix of the database name
-            elif pubman_firstname_initials.startswith(first_name_initials):
-                matching_type = 3  # Partial initials match
-            elif first_name_parts[0] == pubman_firstname_parts[0]:
-                matching_type = 4  # First name parts match
-            else:
-                continue  # No match
+        # No match found; return the input name without middle names or initials
+        # Extract the first name without middle names or initials
+        first_name_no_middle = first_name.split()[0]
+        return first_name_no_middle, surname
 
-            # Decide if this match is better than the best so far
-            pubman_has_middle_name = len(pubman_firstname_parts) > 1
-            pubman_has_abbreviation = is_abbreviated(pubman_firstname)
-            pubman_firstname_parts_count = len(pubman_firstname_parts)
 
-            if matching_type < best_matching_type:
-                best_match = (pubman_firstname, pubman_surname)
-                best_matching_type = matching_type
-                best_first_name_parts_count = pubman_firstname_parts_count
-                best_has_middle_name = pubman_has_middle_name
-                best_has_abbreviation = pubman_has_abbreviation
-            elif matching_type == best_matching_type:
-                # Prefer names without middle names if we find a better match
-                if pubman_has_middle_name:
-                    continue
-                elif not pubman_has_middle_name and best_has_middle_name:
-                    best_match = (pubman_firstname, pubman_surname)
-                    best_first_name_parts_count = pubman_firstname_parts_count
-                    best_has_middle_name = pubman_has_middle_name
-                    best_has_abbreviation = pubman_has_abbreviation
-                else:
-                    # Compare number of first name parts (fewer is better)
-                    if pubman_firstname_parts_count < best_first_name_parts_count:
-                        best_match = (pubman_firstname, pubman_surname)
-                        best_first_name_parts_count = pubman_firstname_parts_count
-                        best_has_abbreviation = pubman_has_abbreviation
-                    elif pubman_firstname_parts_count == best_first_name_parts_count:
-                        # Prefer entries without abbreviations
-                        if not pubman_has_abbreviation and best_has_abbreviation:
-                            best_match = (pubman_firstname, pubman_surname)
-                            best_has_abbreviation = pubman_has_abbreviation
-
-        # Search for a better match that excludes the middle name
-        if best_match and best_has_middle_name:
-            for pubman_firstname, pubman_surname in pubman_names:
-                pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
-                if surname_normalized == pubman_surname_normalized:
-                    # Check if a version of the first name without the middle name exists
-                    pubman_firstname_parts = get_name_parts(pubman_firstname)
-                    if len(pubman_firstname_parts) == 1 and pubman_firstname_parts[0] == first_name_parts[0]:
-                        return pubman_firstname, pubman_surname
-
-        if best_match:
-            return best_match
-        else:
-            # No match found, return incoming name with first name and surname, no middle name
-            first_name_no_middle = first_name.split()[0]
-            return first_name_no_middle, surname
 
     def is_mpi_affiliation(self, affiliation: str) -> bool:
         """Check if the affiliation belongs to the Max-Planck Institute."""
@@ -330,11 +269,13 @@ class DOIParser:
                 self.log.debug(f"Processing author: {author}: {proposed_affiliation}")
                 pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
                 if pubman_author_affiliations:
-                    self.log.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check:", self.is_mpi_affiliation(proposed_affiliation))
+                    self.log.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check: {self.is_mpi_affiliation(proposed_affiliation)}")
 
                     if self.is_mpi_affiliation(proposed_affiliation):
+                        self.log.debug(f"Handling MPI affiliation")
                         affiliation_info = handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations)
                     else:
+                        self.log.debug(f"Handling non-MPI affiliation")
                         affiliation_info = handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations)
                 elif proposed_affiliation.strip():
                     self.log.debug(f"No PuRe affiliation for {author}, but provided by Scopus: {proposed_affiliation}")
@@ -409,7 +350,8 @@ class DOIParser:
                             f.write(chunk)
                     return True
                 else:
-                    self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {response.text}")
+                    cleaned_html = BeautifulSoup(response.text, "html.parser").text
+                    self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
         return False
 
     def get_dois_for_author(self,
@@ -493,19 +435,20 @@ class DOIParser:
 
             if not scopus_metadata:
                 field.append('Publication not found on Scopus')
-            else:
-                author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
-                is_mp_publication = False
-                for _, affiliations in author_affiliation_map.items():
-                    for affiliation in affiliations:
-                        # Scopus sometimes has a Max Plank typo
-                        if self.is_mpi_affiliation(affiliation):
-                            is_mp_publication = True
-                            break
-                    if is_mp_publication:
-                        break
-                if not is_mp_publication:
-                    field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
+            # else:
+                # author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+                # is_mp_publication = False
+                # for _, affiliations in author_affiliation_map.items():
+                #     for affiliation in affiliations:
+                #         print(_, affiliation)
+                #         # Scopus sometimes has a Max Plank typo
+                #         if self.is_mpi_affiliation(affiliation):
+                #             is_mp_publication = True
+                #             break
+                #     if is_mp_publication:
+                #         break
+                # if not is_mp_publication:
+                #     field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
 
             if crossref_metadata:
                 title = crossref_metadata.get('title', [None])[0]
@@ -541,7 +484,7 @@ class DOIParser:
         #         return ['background-color: #999900' for _ in row]  # Yellowish for empty Field
         # print(df.style.apply(highlight_rows, axis=1).render())
 
-    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame) -> List[OrderedDict[str, Tuple[str, int, str]]]:
+    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
         Takes overview dataframe, collects all data for DOIs which are not yet on PuRe and have Scopus and Crossref entries.
         Generates dataframe which can be passed to the excel_generator.create_sheet method to prefill the sheet with data.
@@ -553,7 +496,10 @@ class DOIParser:
         The dict maps column data to a tuple, e.g. `"Title": [title, 35)`
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
-        new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
+        if force:
+            new_dois = df_dois_overview['DOI'].values
+        else:
+            new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
         dois_data = []
         for doi in new_dois:
             self.log.debug("Processing Publication DOI {doi}")
