@@ -55,42 +55,23 @@ class DOIParser:
             'Accept': 'application/json',
             'X-ELS-APIKey': self.scopus_api_key,
         }
-        response = requests.get(url + doi, headers=headers)
-        response.raise_for_status()
-        self.scopus_metadata_map[doi] = response.json()
-        self.log.debug(f'scopus_metadata {response.json()}')
-        return response.json()
+        try:
+            response = requests.get(url + doi, headers=headers)
+            response.raise_for_status()
+            self.scopus_metadata_map[doi] = response.json()
+            self.log.debug(f'scopus_metadata {response.json()}')
+            return response.json()
+        except requests.HTTPError:
+            return None
 
     def extract_crossref_authors_affiliations(self, crossref_metadata):
         affiliations_by_name = OrderedDict()
         for author in crossref_metadata.get('author', []):
-            author_name = self.process_name(self.affiliations_by_name_pubman.keys(), unidecode(author.get('given', ''))), unidecode(unidecode(author.get('family', '')))
+            author_name = self.process_name(self.affiliations_by_name_pubman.keys(), unidecode(author.get('given', '')), unidecode(author.get('family', '')))
             affiliations_by_name[author_name] = []
             for affiliation in author.get('affiliation', []):
                 affiliations_by_name[author_name].append(unidecode(affiliation.get('name', '')))
         return affiliations_by_name
-
-    def get_scopus_author_full_name(self, author_id):
-        scopus_author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
-        headers = {
-            'Accept': 'application/json',
-            'X-ELS-APIKey': self.scopus_api_key
-        }
-        response = requests.get(scopus_author_api_url, headers=headers)
-
-        if response.status_code == 200:
-            author_data = response.json()
-            preferred_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
-            if '.' in (first_name:=preferred_name.get('given-name', '').split()[0]):
-                name_variants = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('name-variant', [])
-                if isinstance(name_variants, list):
-                    for variant in name_variants:
-                        if len(variant_name:=variant.get('given-name', '')) > len(first_name):
-                            first_name = variant_name
-                            break
-            return first_name, preferred_name.get('surname', '')
-        else:
-            raise RuntimeError(f"Unable to retrieve author data for author {author_id} (status code: {response.status_code}, {response.text}")
 
     def extract_scopus_authors_affiliations(self, scopus_metadata) -> OrderedDict[str, List[str]]:
         """
@@ -143,12 +124,33 @@ class DOIParser:
                 if author_id:
                     first_name, surname = self.get_scopus_author_full_name(author_id)
             full_name = self.process_name(self.affiliations_by_name_pubman.keys(), first_name, surname)
-            print("fff", first_name, surname, full_name)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
             author_affiliation_map[full_name] = unique_affiliations
         return author_affiliation_map
+
+    def get_scopus_author_full_name(self, author_id):
+        scopus_author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
+        headers = {
+            'Accept': 'application/json',
+            'X-ELS-APIKey': self.scopus_api_key
+        }
+        response = requests.get(scopus_author_api_url, headers=headers)
+
+        if response.status_code == 200:
+            author_data = response.json()
+            preferred_name = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('preferred-name', {})
+            if '.' in (first_name:=preferred_name.get('given-name', '').split()[0]):
+                name_variants = author_data.get('author-retrieval-response', [{}])[0].get('author-profile', {}).get('name-variant', [])
+                if isinstance(name_variants, list):
+                    for variant in name_variants:
+                        if len(variant_name:=variant.get('given-name', '')) > len(first_name):
+                            first_name = variant_name
+                            break
+            return first_name, preferred_name.get('surname', '')
+        else:
+            raise RuntimeError(f"Unable to retrieve author data for author {author_id} (status code: {response.status_code}, {response.text}")
 
     def parse_date(self, date_value):
         if isinstance(date_value, str):
@@ -433,8 +435,8 @@ class DOIParser:
             crossref_metadata = self.get_crossref_metadata(doi)
             scopus_metadata = self.get_scopus_metadata(doi)
 
-            if not scopus_metadata:
-                field.append('Publication not found on Scopus')
+            # if not scopus_metadata:
+            #     field.append('Publication not found on Scopus')
             # else:
                 # author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
                 # is_mp_publication = False
@@ -507,10 +509,7 @@ class DOIParser:
             if not crossref_metadata:
                 return None
             self.log.debug(f"crossref_metadata {crossref_metadata}")
-            try:
-                scopus_metadata = self.get_scopus_metadata(doi)
-            except requests.HTTPError:
-                scopus_metadata = None
+            scopus_metadata = self.get_scopus_metadata(doi)
             self.log.debug(f"scopus_metadata {scopus_metadata}")
 
             def clean_html(raw_html):
@@ -527,16 +526,26 @@ class DOIParser:
             article_number = crossref_metadata.get('article-number', '')
 
             license_type = 'closed'
-            # if scopus_metadata:
-            affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
-            if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
-                license_type = 'open'
-                pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
-
-            date_issued_scopus = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['source']['publicationdate']
-            date_issued = (f"{date_issued_scopus.get('day', '').zfill(2)}." if date_issued_scopus.get('day') else "") + \
-                          (f"{date_issued_scopus.get('month', '').zfill(2)}." if date_issued_scopus.get('month') else "") + \
-                          (date_issued_scopus.get('year', '') ).rstrip('.')
+            if scopus_metadata:
+                affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
+                if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])==1:
+                    license_type = 'open'
+                    pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
+                date_issued_scopus = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['source']['publicationdate']
+                date_issued = (f"{date_issued_scopus.get('day', '').zfill(2)}." if date_issued_scopus.get('day') else "") + \
+                              (f"{date_issued_scopus.get('month', '').zfill(2)}." if date_issued_scopus.get('month') else "") + \
+                              (date_issued_scopus.get('year', '') ).rstrip('.')
+            else:
+                if crossref_metadata.get('license'):
+                    pdf_found = False
+                self.log.info(f'Scopus not available for {doi}, using crossref affiliations...')
+                affiliations_by_name = self.extract_crossref_authors_affiliations(crossref_metadata)
+                date_issued_crossref = crossref_metadata['issued']['date-parts']
+                print("hahaha", len(date_issued_crossref[0]))
+                date_issued = (f"{date_issued_crossref[0][2]}." if len(date_issued_crossref[0])==3 else "") + \
+                              (f"{date_issued_crossref[0][1]}." if len(date_issued_crossref[0])>=2 else "") + \
+                              (f"{date_issued_crossref[0][0]}")
+                print("date_issuedct",date_issued)
             cleaned_author_list = self.process_author_list(affiliations_by_name, title)
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
