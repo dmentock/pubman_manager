@@ -11,7 +11,7 @@
 
         <!-- Parse DOIs and Download Excel -->
         <h4>Parse DOIs and Download Excel</h4>
-        <form method="post" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="showLoading()">
+        <form method="post" action="{{ url_for('download_publications_excel') }}" enctype="multipart/form-data" onsubmit="showLoading()">
             <textarea name="dois" rows="10" cols="50" placeholder="Enter DOIs, one per line"></textarea><br><br>
             <input type="submit" value="Process DOIs and Download">
         </form>
@@ -30,6 +30,13 @@
             <input type="file" name="pub_file" accept=".xlsx" required><br><br>
             <input type="submit" value="Upload and Create Publications">
         </form>
+
+    <h4>Tracked Authors</h4>
+    <p>Receive regular updates of new publications by these authors:</p>
+    <form method="post" action="{{ url_for('save_tracked_authors') }}">
+        <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter authors, one per line">{{ tracked_authors }}</textarea><br><br>
+        <button type="submit">Save</button>
+    </form>
     </div>
 
     <!-- Talks and Posters Section -->

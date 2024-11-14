@@ -2,7 +2,6 @@ import yaml
 from collections import OrderedDict
 
 from pubman_manager import PubmanExtractor, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
-
 extractor = PubmanExtractor()
 
 def update_cache(org_id):

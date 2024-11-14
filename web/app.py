@@ -4,6 +4,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import logging
 import yaml
+from pathlib import Path
 
 from update_cache import update_cache
 from pubman_manager import PubmanExtractor, create_sheet
@@ -18,7 +19,7 @@ login_manager.login_view = 'login'
 def periodic_task():
     with app.app_context():
         logging.info("Updating Pubman Cache + Talks template")
-        with open('users.yaml', 'r') as f:
+        with open(Path(__file__).parent / 'users.yaml', 'r') as f:
             users = yaml.safe_load(f)
         for org_id in {users[user]['org_id'] for user in users.keys()}:
             update_cache(org_id)
@@ -37,5 +38,6 @@ scheduler.add_job(
 import atexit
 atexit.register(lambda: scheduler.shutdown())
 
+from routes import *
 if __name__ == '__main__':
     app.run(host='0.0.0.0', debug=True)

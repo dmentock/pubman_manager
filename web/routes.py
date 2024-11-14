@@ -7,12 +7,13 @@ import traceback
 import tempfile
 import pandas as pd
 import yaml
+from pathlib import Path
 
 from app import app, login_manager
 from user import User
 
 from update_cache import update_cache
-from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR
+from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, PUBMAN_CACHE_DIR
 
 # Initialize your core objects
 # pubman_api = None
@@ -41,19 +42,24 @@ def login():
             print("oops")
             username = form.username.data
             auth_token, user_id = PubmanCreator.login(username, form.password.data)
+            org_id , ctx_id = PubmanCreator.get_user_org_and_ctx(auth_token, user_id)
+            with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+                users = yaml.safe_load(f)
+            if org_id not in {user['org_id'] for user in users.values()}:
+                update_cache(org_id)
+                users[user_id] = {
+                    'org_id': org_id,
+                    'ctx_id': ctx_id,
+                    'tracked_authors': []
+                }
+                with open('users.yaml', 'w') as f:
+                    yaml.dump(users, f)
+
             print("keke")
             pubman_creator = PubmanCreator(auth_token=auth_token, user_id=user_id)
             doi_parser = DOIParser(pubman_creator, logging_level=logging.DEBUG)
             user = User(username)
             login_user(user)
-            with open('users.yaml', 'r') as f:
-                users = yaml.safe_load(f)
-            if user_id not in users:
-                users[user_id] = {
-                    'org_id': pubman_creator.org_id,
-                    'ctx_id': pubman_creator.ctx_id,
-                    'tracked_authors': []
-                }
             return redirect(url_for('dashboard'))
         except Exception as e:
             error_message = traceback.format_exc()
@@ -66,28 +72,26 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-@app.route('/dashboard', methods=['GET', 'POST'])
+@app.route('/download_publications_excel', methods=['POST'])
 @login_required
-def dashboard():
-    if request.method == 'POST':
-        dois = request.form.get('dois').splitlines()
-        dois = [doi.strip() for doi in dois if doi.strip()]
-        try:
-            print("dois",dois)
-            df_dois_overview = doi_parser.filter_dois(dois)
-            dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            temp_file_path = temp_file.name  # Store the file path
-            try:
-                doi_parser.write_dois_data(temp_file_path, dois_data)
-                return send_file(temp_file_path, as_attachment=True, download_name=os.path.basename(temp_file_path), mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            finally:
-                temp_file.close()
-        except Exception as e:
-            error_message = traceback.format_exc()
-            flash(f'Error: {error_message}')
+def download_publications_excel():
+    # Extract DOIs from the form
+    dois = request.form.get('dois', '').splitlines()
+    dois = [doi.strip() for doi in dois if doi.strip()]
+    if not dois:
+        flash('No valid DOIs provided.')
+        return redirect(url_for('dashboard'))
 
-    return render_template('dashboard.html')
+    try:
+        # Process DOIs and generate Excel
+        df_dois_overview = doi_parser.filter_dois(dois)
+        dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        doi_parser.write_dois_data(temp_file.name, dois_data)
+        return send_file(temp_file.name, as_attachment=True, download_name="publications.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        flash(f"Error processing DOIs: {traceback.format_exc()}")
+        return redirect(url_for('dashboard'))
 
 @app.after_request
 def delete_temp_file(response):
@@ -103,30 +107,50 @@ def delete_temp_file(response):
 @app.route('/create_publications', methods=['POST'])
 @login_required
 def create_publications():
-    if 'pub_file' not in request.files:
-        flash('No file uploaded.')
-        return redirect(url_for('dashboard'))
-    file = request.files['pub_file']
-    if file.filename == '':
+    file = request.files.get('pub_file')
+    if not file or file.filename == '':
         flash('No file selected.')
         return redirect(url_for('dashboard'))
+
     try:
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1])
-        g.temp_file_path = temp_file.name  # Store the file path in `g`
-        file.save(g.temp_file_path)        # Save the uploaded file to the temporary file
-        pubman_creator.create_publications(g.temp_file_path, overwrite=True, submit_items=False)
-        flash(f'Publications created from uploaded file: {file.filename}')
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        file.save(temp_file.name)
+        pubman_creator.create_publications(temp_file.name, overwrite=True, submit_items=False)
+        flash('Publications created successfully.')
     except Exception as e:
-        error_message = traceback.format_exc()
-        flash(f'Error: {error_message}')
+        flash(f"Error creating publications: {traceback.format_exc()}")
+    return redirect(url_for('dashboard'))
+
+@app.route('/dashboard', methods=['GET'])
+@login_required
+def dashboard():
+    tracked_authors = ['bob', 'aeae']
+    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+        users = yaml.safe_load(f)
+    tracked_authors = users[pubman_creator.user_id]['tracked_authors']
+    tracked_authors_str = "\n".join(tracked_authors)
+    return render_template('dashboard.html', tracked_authors=tracked_authors_str)
+
+@app.route('/save_tracked_authors', methods=['POST'])
+@login_required
+def save_tracked_authors():
+    authors = request.form.get('tracked_authors', '').splitlines()
+    authors = [author.strip() for author in authors if author.strip()]
+    print("authors", authors)
+    try:
+        with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+            users = yaml.safe_load(f)
+        users[pubman_creator.user_id]['tracked_authors'] = authors
+        with open(Path(__file__).parent / 'users.yaml', 'w') as f:
+            yaml.dump(users, f)
+        flash('Tracked authors updated successfully.')
+    except Exception as e:
+        flash(f"Error saving authors: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
 @app.route('/download_talks_template', methods=['GET'])
 @login_required
 def download_talks_template():
-    if not (TALKS_DIR / f'Template_Talks_{pubman_creator.org_id}.xlsx').exists():
-        flash(f'Downloading data for new institute, please wait ~5 min')
-        update_cache(pubman_creator.org_id)
     try:
         return send_file(
             TALKS_DIR / 'Template_Talks.xlsx',

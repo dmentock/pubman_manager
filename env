@@ -1,5 +1,5 @@
 BASE_URL="https://pure.mpg.de/rest"
-USERNAME="<username>"
+USER="<username>"
 PASSWORD="<password>"
 
 SCOPUS_API_KEY="<key>"

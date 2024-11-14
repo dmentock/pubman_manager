@@ -19,6 +19,9 @@ class PubmanExtractor(PubmanBase):
             yaml.dump(authors_info, f)
         with open(PUBMAN_CACHE_DIR / org_id / 'identifier_paths.yaml', 'w', encoding='utf-8') as f:
             yaml.dump(self.extract_organization_mapping(publications), f)
+        journals = self.extract_journal_names(publications)
+        with open(PUBMAN_CACHE_DIR / org_id / "journals.yaml", "w") as f:
+            yaml.dump(journals, f)
 
     def extract_organization_mapping(self, data):
         organizations = {}

@@ -23,13 +23,14 @@ class PubmanBase:
             self.user_id = user_id
         else:
             self.log.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
-            self.auth_token, self.user_id = self.login(ENV_USERNAME, ENV_PASSWORD)
+            self.auth_token, self.user_id, = self.login(ENV_USERNAME, ENV_PASSWORD)
+
         self.headers = {"Authorization": self.auth_token}
         self.headers_json = {
             "Authorization": self.auth_token,
             "Content-Type": "application/json"
         }
-        self.org_id , self.ctx_id = self.get_user_org_and_ctx()
+        self.org_id , self.ctx_id = PubmanBase.get_user_org_and_ctx(self.auth_token, self.user_id)
 
     @staticmethod
     def login(username, password):
@@ -41,9 +42,10 @@ class PubmanBase:
         if login_response.status_code == 200:
             auth_token = login_response.headers.get("Token")
             decoded_token = jwt.decode(auth_token, options={"verify_signature": False})
-            return auth_token, decoded_token['id']
+            user_id = decoded_token['id']
+            return auth_token, user_id
         else:
-            raise Exception("Failed to log in to PuRe")
+            raise Exception(f"Failed to log in to PuRe: {login_response.text}")
 
     def logout(self):
         logout_response = requests.get(
@@ -53,10 +55,14 @@ class PubmanBase:
         if logout_response.status_code != 200:
             raise Exception("Failed to log out")
 
-    def get_user_org_and_ctx(self):
+    @staticmethod
+    def get_user_org_and_ctx(auth_token, user_id):
         response = requests.get(
-            f"https://pure.mpg.de/rest/users/{self.user_id}",
-            headers=self.headers_json
+            f"https://pure.mpg.de/rest/users/{user_id}",
+            headers={
+                    "Authorization": auth_token,
+                    "Content-Type": "application/json"
+                }
         )
         if response.status_code != 200:
             raise Exception("Failed to log out")

@@ -15,11 +15,11 @@ import math
 class PubmanCreator(PubmanBase):
     def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token=None, user_id=None):
         super().__init__(auth_token=auth_token, user_id=user_id, base_url=base_url)
-        with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'r') as f:
+        with open(PUBMAN_CACHE_DIR / self.org_id / 'identifier_paths.yaml', 'r') as f:
             self.identifier_paths = yaml.load(f, Loader=yaml.FullLoader)
-        with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r') as f:
+        with open(PUBMAN_CACHE_DIR / self.org_id / 'authors_info.yaml', 'r') as f:
             self.authors_info = yaml.load(f, Loader=yaml.FullLoader)
-        with open(PUBMAN_CACHE_DIR / 'journals.yaml', 'r') as f:
+        with open(PUBMAN_CACHE_DIR / self.org_id / 'journals.yaml', 'r') as f:
             self.journals = yaml.load(f, Loader=yaml.FullLoader)
 
     def parse_excel_table(self, file_path):
