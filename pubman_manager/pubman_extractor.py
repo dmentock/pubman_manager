@@ -1,13 +1,26 @@
-from pubman_manager import PubmanBase
+from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR
 import yaml
 import requests
 import json
 from fuzzywuzzy import fuzz
 
 class PubmanExtractor(PubmanBase):
-    def extract_organization_mapping(self, yaml_file):
-        with open(yaml_file, 'r', encoding='utf-8') as file:
-            data = yaml.safe_load(file)
+
+    def extract_org_data(self, org_id):
+        (PUBMAN_CACHE_DIR / org_id).mkdir(parents=True, exist_ok=True)
+        publications = []
+        org_publications = self.search_publications_by_organization(org_id, size=200000)
+        publications.extend(org_publications)
+        with open(PUBMAN_CACHE_DIR / org_id / "publications.yaml", "w") as f:
+            yaml.dump(publications, f)
+        authors_info = self.extract_authors_info(publications)
+        authors_info[('Dierk', 'Raabe')]['affiliations'] = ['Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society']
+        with open(PUBMAN_CACHE_DIR / org_id / "authors_info.yaml", "w") as f:
+            yaml.dump(authors_info, f)
+        with open(PUBMAN_CACHE_DIR / org_id / 'identifier_paths.yaml', 'w', encoding='utf-8') as f:
+            yaml.dump(self.extract_organization_mapping(publications), f)
+
+    def extract_organization_mapping(self, data):
         organizations = {}
         for publication in data:
             creators = publication.get('data', {}).get('metadata', {}).get('creators', [])

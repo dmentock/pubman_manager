@@ -24,7 +24,7 @@ class DOIParser:
         self.log.setLevel(logging_level)
         self.scopus_api_key = scopus_api_key if scopus_api_key else ENV_SCOPUS_API_KEY
         self.pubman_api = pubman_api
-        with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
+        with open(PUBMAN_CACHE_DIR / pubman_api.org_id / 'authors_info.yaml', 'r', encoding='utf-8') as f:
             self.affiliations_by_name_pubman = yaml.load(f, Loader=yaml.FullLoader)
         mpi_affiliation_counter = Counter()
         for author, author_info in self.affiliations_by_name_pubman.items():

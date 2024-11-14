@@ -1,15 +1,18 @@
 # routes.py
 from flask import render_template, redirect, url_for, request, flash, send_file, g, send_from_directory
 from flask_login import login_user, login_required, logout_user, current_user
-from app import app, login_manager
-from user import User
-from pubman_manager import DOIParser, PubmanBase, PubmanCreator, PUBLICATIONS_DIR
-import datetime
 import logging
 import os
 import traceback
 import tempfile
 import pandas as pd
+import yaml
+
+from app import app, login_manager
+from user import User
+
+from update_cache import update_cache
+from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR
 
 # Initialize your core objects
 # pubman_api = None
@@ -43,6 +46,14 @@ def login():
             doi_parser = DOIParser(pubman_creator, logging_level=logging.DEBUG)
             user = User(username)
             login_user(user)
+            with open('users.yaml', 'r') as f:
+                users = yaml.safe_load(f)
+            if user_id not in users:
+                users[user_id] = {
+                    'org_id': pubman_creator.org_id,
+                    'ctx_id': pubman_creator.ctx_id,
+                    'tracked_authors': []
+                }
             return redirect(url_for('dashboard'))
         except Exception as e:
             error_message = traceback.format_exc()
@@ -105,41 +116,51 @@ def create_publications():
         file.save(g.temp_file_path)        # Save the uploaded file to the temporary file
         pubman_creator.create_publications(g.temp_file_path, overwrite=True, submit_items=False)
         flash(f'Publications created from uploaded file: {file.filename}')
-
     except Exception as e:
         error_message = traceback.format_exc()
         flash(f'Error: {error_message}')
-
     return redirect(url_for('dashboard'))
 
-@app.route('/download_publication_template')
-@login_required
-def download_publication_template():
-    return send_file(PUBLICATION_TEMPLATE_PATH, as_attachment=True, download_name="publication_template.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-# Route to download the talks template
-@app.route('/download_talks_template')
+@app.route('/download_talks_template', methods=['GET'])
 @login_required
 def download_talks_template():
-    return send_file(TALKS_TEMPLATE_PATH, as_attachment=True, download_name="talks_template.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    if not (TALKS_DIR / f'Template_Talks_{pubman_creator.org_id}.xlsx').exists():
+        flash(f'Downloading data for new institute, please wait ~5 min')
+        update_cache(pubman_creator.org_id)
+    try:
+        return send_file(
+            TALKS_DIR / 'Template_Talks.xlsx',
+            as_attachment=True,
+            download_name="talks_template.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        error_message = traceback.format_exc()
+        flash(f"Error: Unable to download template. Details: {error_message}")
+        return redirect(url_for('dashboard'))
 
-# Route to upload a file for creating talks
 @app.route('/create_talks', methods=['POST'])
 @login_required
 def create_talks():
     if 'talks_file' not in request.files:
         flash('No file uploaded.')
         return redirect(url_for('dashboard'))
+
     file = request.files['talks_file']
     if file.filename == '':
         flash('No file selected.')
         return redirect(url_for('dashboard'))
+
     try:
+        # Save the uploaded file to a temporary location
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1])
-        g.temp_file_path = temp_file.name  # Store the file path in `g`
-        file.save(g.temp_file_path)        # Save the uploaded file to the temporary file
-        api.create_talks(g.temp_file_path, create_items=True, submit_items=True, overwrite=True)
-        flash(f'Talks created from uploaded file: {file.filename}')
+        temp_file_path = temp_file.name  # Store the temp file path
+        g.temp_file_path = temp_file_path  # Save the file path for later cleanup
+        file.save(temp_file_path)
+
+        # Process the uploaded file to create talks
+        pubman_creator.create_talks(temp_file_path, create_items=True, submit_items=True, overwrite=True)
+        flash(f'Talks created successfully from file: {file.filename}')
     except Exception as e:
         error_message = traceback.format_exc()
         flash(f'Error: {error_message}')

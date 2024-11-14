@@ -4,23 +4,50 @@
 {% block content %}
 <h2>Dashboard</h2>
 
-<h3>Parse DOIs and Download Excel</h3>
-<form method="post" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="showLoading()">
-    <textarea name="dois" rows="10" cols="50" placeholder="Enter DOIs, one per line"></textarea><br><br>
-    <input type="submit" value="Process DOIs and Download">
-</form>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Publications Section -->
+    <div>
+        <h3>Publications</h3>
 
-<div id="loading" style="display:none;">Loading...</div>
+        <!-- Parse DOIs and Download Excel -->
+        <h4>Parse DOIs and Download Excel</h4>
+        <form method="post" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="showLoading()">
+            <textarea name="dois" rows="10" cols="50" placeholder="Enter DOIs, one per line"></textarea><br><br>
+            <input type="submit" value="Process DOIs and Download">
+        </form>
 
-<script>
-    function showLoading() {
-        document.getElementById("loading").style.display = "block";
-    }
-</script>
+        <div id="loading" style="display:none;">Loading...</div>
 
-<h3>Upload Excel File to Create Publications</h3>
-<form method="post" action="{{ url_for('create_publications') }}" enctype="multipart/form-data">
-    <input type="file" name="pub_file" accept=".xlsx" required><br><br>
-    <input type="submit" value="Upload and Create Publications">
-</form>
+        <script>
+            function showLoading() {
+                document.getElementById("loading").style.display = "block";
+            }
+        </script>
+
+        <!-- Upload Excel File to Create Publications -->
+        <h4>Upload Excel File to Create Publications</h4>
+        <form method="post" action="{{ url_for('create_publications') }}" enctype="multipart/form-data">
+            <input type="file" name="pub_file" accept=".xlsx" required><br><br>
+            <input type="submit" value="Upload and Create Publications">
+        </form>
+    </div>
+
+    <!-- Talks and Posters Section -->
+    <div>
+        <h3>Talks and Posters</h3>
+
+        <!-- Download Talks Template -->
+        <h4>Download Current Talks Template</h4>
+        <form method="get" action="{{ url_for('download_talks_template') }}">
+            <button type="submit">Download Talks Template</button>
+        </form>
+
+        <!-- Upload Talks File -->
+        <h4>Upload Talks Excel File</h4>
+        <form method="post" action="{{ url_for('create_talks') }}" enctype="multipart/form-data">
+            <input type="file" name="talks_file" accept=".xlsx" required><br><br>
+            <input type="submit" value="Upload and Create Talks">
+        </form>
+    </div>
+</div>
 {% endblock %}

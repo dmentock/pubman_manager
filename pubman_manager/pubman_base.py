@@ -7,7 +7,7 @@ import jwt
 from collections import OrderedDict
 from pathlib import Path
 
-from pubman_manager import PUBMAN_CACHE_DIR, ENV_USERNAME, ENV_PASSWORD
+from pubman_manager import ENV_USERNAME, ENV_PASSWORD
 
 class PubmanBase:
     def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token = None, user_id=None):
@@ -15,16 +15,21 @@ class PubmanBase:
         self.log = logging.getLogger()
         self.base_url = base_url
 
-        self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
+        # self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
         # self.user_id = "user_1944725"  # PuRe User id for user PuRe user "Mentock", TODO: fetch automatically based on username
-        self.ctx_id = "ctx_2019354" # PuRe CTX ID for all MPIE publications, TODO: fetch based on org_id
+        # self.ctx_id = "ctx_2019354" # PuRe CTX ID for all MPIE publications, TODO: fetch based on org_id
         if auth_token and user_id:
             self.auth_token = auth_token
             self.user_id = user_id
         else:
             self.log.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
             self.auth_token, self.user_id = self.login(ENV_USERNAME, ENV_PASSWORD)
-
+        self.headers = {"Authorization": self.auth_token}
+        self.headers_json = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json"
+        }
+        self.org_id , self.ctx_id = self.get_user_org_and_ctx()
 
     @staticmethod
     def login(username, password):
@@ -34,7 +39,6 @@ class PubmanBase:
             data=f"{username}:{password}"
         )
         if login_response.status_code == 200:
-            print("login_response.headers",login_response.headers)
             auth_token = login_response.headers.get("Token")
             decoded_token = jwt.decode(auth_token, options={"verify_signature": False})
             return auth_token, decoded_token['id']
@@ -44,36 +48,48 @@ class PubmanBase:
     def logout(self):
         logout_response = requests.get(
             f"{self.base_url}/logout",
-            headers={"Authorization": self.auth_token}
+            headers=self.headers
         )
         if logout_response.status_code != 200:
             raise Exception("Failed to log out")
 
+    def get_user_org_and_ctx(self):
+        response = requests.get(
+            f"https://pure.mpg.de/rest/users/{self.user_id}",
+            headers=self.headers_json
+        )
+        if response.status_code != 200:
+            raise Exception("Failed to log out")
+        r = response.json()
+        org = r['affiliation']['objectId']
+        ctx = r['grantList'][-1]['objectRef']
+        return org, ctx
+
     def get_item(self, publication_id):
         response = requests.get(
             f"{self.base_url}/items/{publication_id}",
-            headers={"Authorization": self.auth_token}
+            headers=self.headers
         )
         return response.json()
 
     def get_item_history(self, publication_id):
         response = requests.get(
             f"{self.base_url}/items/{publication_id}/history",
-            headers={"Authorization": self.auth_token}
+            headers=self.headers
         )
         return response.json()
 
     def get_component_content(self, publication_id, file_id):
         response = requests.get(
             f"{self.base_url}/items/{publication_id}/component/{file_id}/content",
-            headers={"Authorization": self.auth_token}
+            headers=self.headers
         )
         return response.content
 
     def get_component_metadata(self, publication_id, file_id):
         response = requests.get(
             f"{self.base_url}/items/{publication_id}/component/{file_id}/metadata",
-            headers={"Authorization": self.auth_token}
+            headers=self.headers
         )
         return response.json()
 
@@ -84,10 +100,7 @@ class PubmanBase:
             "cslConeId": cslConeId,
             "scroll": str(scroll).lower()
         }
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.post(
             f"{self.base_url}/items/search",
             headers=headers,
@@ -103,9 +116,7 @@ class PubmanBase:
             "cslConeId": cslConeId,
             "scrollId": scrollId
         }
-        headers = {
-            "Authorization": self.auth_token
-        }
+        headers = self.headers
         response = requests.get(
             f"{self.base_url}/items/search/scroll",
             headers=headers,
@@ -116,9 +127,7 @@ class PubmanBase:
     def stage_file(self, component_name, file_path):
         with open(file_path, 'rb') as f:
             file_data = f.read()
-        headers = {
-            "Authorization": self.auth_token
-        }
+        headers = self.headers
         response = requests.post(
             f"{self.base_url}/staging/{component_name}",
             headers=headers,
@@ -127,10 +136,7 @@ class PubmanBase:
         return response.json()
 
     def update_item(self, item_id, item_data):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.put(
             f"{self.base_url}/items/{item_id}",
             headers=headers,
@@ -139,10 +145,7 @@ class PubmanBase:
         return response.json()
 
     def delete_item(self, item_id, last_modification_date):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.delete(
             f"{self.base_url}/items/{item_id}",
             headers=headers,
@@ -152,10 +155,7 @@ class PubmanBase:
         #     self.log.info(f'deleting item {item_id} failed: {response.text}')
 
     def submit_item(self, item_id, last_modification_date, comment):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.put(
             f"{self.base_url}/items/{item_id}/submit",
             headers=headers,
@@ -164,10 +164,7 @@ class PubmanBase:
         return response.json()
 
     def release_item(self, item_id, last_modification_date, comment):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.put(
             f"{self.base_url}/items/{item_id}/release",
             headers=headers,
@@ -176,10 +173,7 @@ class PubmanBase:
         return response.json()
 
     def withdraw_item(self, item_id, last_modification_date, comment):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.put(
             f"{self.base_url}/items/{item_id}/withdraw",
             headers=headers,
@@ -188,10 +182,7 @@ class PubmanBase:
         return response.json()
 
     def revise_item(self, item_id, last_modification_date, comment):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.put(
             f"{self.base_url}/items/{item_id}/revise",
             headers=headers,
@@ -200,10 +191,7 @@ class PubmanBase:
         return response.json()
 
     def fetch_scroll_results(self, scroll_id):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.get(
             f"{self.base_url}/items/search/scroll?scrollId={scroll_id}",
             headers=headers
@@ -246,10 +234,7 @@ class PubmanBase:
             "size": size  # Adjust the size as needed
         }
 
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
 
         print("headers",headers)
         print("query",query)
@@ -266,10 +251,7 @@ class PubmanBase:
 
 
     def create_item(self, request_json):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         response = requests.post(
             f"{self.base_url}/items",
             headers=headers,
@@ -281,10 +263,7 @@ class PubmanBase:
             raise Exception("Failed to create item", response.status_code, response.text)
 
     def submit_item(self, item_id, last_modification_date):
-        headers = {
-            "Authorization": self.auth_token,
-            "Content-Type": "application/json"
-        }
+        headers = self.headers_json
         submit_data = {
             "comment": "Item Submitted via API",
             "lastModificationDate": last_modification_date
