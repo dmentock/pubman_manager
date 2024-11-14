@@ -2,6 +2,7 @@ import requests
 import json
 import logging
 import pandas as pd
+import jwt
 
 from collections import OrderedDict
 from pathlib import Path
@@ -9,31 +10,36 @@ from pathlib import Path
 from pubman_manager import PUBMAN_CACHE_DIR, ENV_USERNAME, ENV_PASSWORD
 
 class PubmanBase:
-    def __init__(self, username=None, password=None, base_url = "https://pure.mpg.de/rest"):
+    def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token = None, user_id=None):
         logging.basicConfig(level=logging.INFO)
         self.log = logging.getLogger()
         self.base_url = base_url
-        self.username = username if username else ENV_USERNAME
-        self.password = password if password else ENV_PASSWORD
-        self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
-        self.user_id = "user_1944725"  # PuRe User id for user PuRe user "Mentock", TODO: fetch automatically based on username
-        self.ctx_id = "ctx_2019354" # PuRe CTX ID for all MPIE publications, TODO: fetch based on org_id
-        try:
-            self.auth_token = self.login()
-        except:
-            self.log.info("login failed")
 
-    def login(self):
+        self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
+        # self.user_id = "user_1944725"  # PuRe User id for user PuRe user "Mentock", TODO: fetch automatically based on username
+        self.ctx_id = "ctx_2019354" # PuRe CTX ID for all MPIE publications, TODO: fetch based on org_id
+        if auth_token and user_id:
+            self.auth_token = auth_token
+            self.user_id = user_id
+        else:
+            self.log.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
+            self.auth_token, self.user_id = self.login(ENV_USERNAME, ENV_PASSWORD)
+
+
+    @staticmethod
+    def login(username, password):
         login_response = requests.post(
-            f"{self.base_url}/login",
+            f"https://pure.mpg.de/rest/login",
             headers={"Content-Type": "text/plain"},
-            data=f"{self.username}:{self.password}"
+            data=f"{username}:{password}"
         )
         if login_response.status_code == 200:
-            self.auth_token = login_response.headers.get("Token")
-            return self.auth_token
+            print("login_response.headers",login_response.headers)
+            auth_token = login_response.headers.get("Token")
+            decoded_token = jwt.decode(auth_token, options={"verify_signature": False})
+            return auth_token, decoded_token['id']
         else:
-            raise Exception("Failed to log in")
+            raise Exception("Failed to log in to PuRe")
 
     def logout(self):
         logout_response = requests.get(
@@ -244,6 +250,9 @@ class PubmanBase:
             "Authorization": self.auth_token,
             "Content-Type": "application/json"
         }
+
+        print("headers",headers)
+        print("query",query)
         response = requests.post(
             f"{self.base_url}/items/search",
             headers=headers,

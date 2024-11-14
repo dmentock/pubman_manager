@@ -1,0 +1,26 @@
+<!-- templates/dashboard.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<h3>Parse DOIs and Download Excel</h3>
+<form method="post" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" onsubmit="showLoading()">
+    <textarea name="dois" rows="10" cols="50" placeholder="Enter DOIs, one per line"></textarea><br><br>
+    <input type="submit" value="Process DOIs and Download">
+</form>
+
+<div id="loading" style="display:none;">Loading...</div>
+
+<script>
+    function showLoading() {
+        document.getElementById("loading").style.display = "block";
+    }
+</script>
+
+<h3>Upload Excel File to Create Publications</h3>
+<form method="post" action="{{ url_for('create_publications') }}" enctype="multipart/form-data">
+    <input type="file" name="pub_file" accept=".xlsx" required><br><br>
+    <input type="submit" value="Upload and Create Publications">
+</form>
+{% endblock %}

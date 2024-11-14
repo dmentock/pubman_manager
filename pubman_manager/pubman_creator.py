@@ -13,8 +13,8 @@ import re
 import math
 
 class PubmanCreator(PubmanBase):
-    def __init__(self, username=None, password=None, base_url = "https://pure.mpg.de/rest"):
-        super().__init__(username=username, password=password, base_url=base_url)
+    def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token=None, user_id=None):
+        super().__init__(auth_token=auth_token, user_id=user_id, base_url=base_url)
         with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'r') as f:
             self.identifier_paths = yaml.load(f, Loader=yaml.FullLoader)
         with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r') as f:
