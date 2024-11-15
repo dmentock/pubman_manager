@@ -30,7 +30,12 @@ class PubmanBase:
             "Authorization": self.auth_token,
             "Content-Type": "application/json"
         }
-        self.org_id , self.ctx_id = PubmanBase.get_user_org_and_ctx(self.auth_token, self.user_id)
+        user_info = PubmanBase.get_user_info(self.auth_token, self.user_id)
+        self.ctx_id = user_info['ctx_id']
+        self.org_id = user_info['org_id']
+        self.org_name = user_info['org_name']
+        self.user_name = user_info['user_name']
+        self.user_email = user_info['user_email']
 
     @staticmethod
     def login(username, password):
@@ -56,7 +61,7 @@ class PubmanBase:
             raise Exception("Failed to log out")
 
     @staticmethod
-    def get_user_org_and_ctx(auth_token, user_id):
+    def get_user_info(auth_token, user_id):
         response = requests.get(
             f"https://pure.mpg.de/rest/users/{user_id}",
             headers={
@@ -67,9 +72,13 @@ class PubmanBase:
         if response.status_code != 200:
             raise Exception("Failed to log out")
         r = response.json()
-        org = r['affiliation']['objectId']
-        ctx = r['grantList'][-1]['objectRef']
-        return org, ctx
+        return {
+            'org_id': r['affiliation']['objectId'],
+            'ctx_id': r['grantList'][-1]['objectRef'],
+            'user_name': r['name'],
+            'org_name': r['affiliation']['name'],
+            'user_email': r['email']
+        }
 
     def get_item(self, publication_id):
         response = requests.get(

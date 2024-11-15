@@ -15,6 +15,7 @@ import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
+from urllib.parse import urlencode
 
 from pubman_manager import create_sheet, Cell, FILES_DIR, PUBMAN_CACHE_DIR, ENV_SCOPUS_API_KEY, SCOPUS_AFFILIATION_ID
 
@@ -34,6 +35,34 @@ class DOIParser:
         self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.crossref_metadata_map = {}
         self.scopus_metadata_map = {}
+        self.af_id_ = None
+
+    @property
+    def af_id(self):
+        if self.af_id_:
+            return self.af_id_
+        BASE_URL = "https://api.elsevier.com/content/search/affiliation"
+        params = {
+            "query": f"AFFIL({self.pubman_api.org_name})"
+        }
+        encoded_params = urlencode(params)
+        headers = {
+            "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
+            "Accept": "application/json"
+        }
+        response = requests.get(f"{BASE_URL}?{encoded_params}", headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if "search-results" in data and "entry" in data["search-results"]:
+                for affiliation in data["search-results"]["entry"]:
+                    dc_identifier = affiliation.get('dc:identifier', 'Unknown')
+                    af_id = dc_identifier.split(":")[-1] if dc_identifier.startswith("AFFILIATION_ID:") else None
+                    self.af_id_ = af_id
+                    return af_id
+            else:
+                raise RuntimeError(f"Scopus API request to get AF-ID from '{self.pubman_api.org_name}' unsuccessful, unexpected datastructure: {data}")
+        else:
+            raise RuntimeError(f"Scopus API request to get AF-ID from '{self.pubman_api.org_name}' unsuccessful: {response.status_code} - {response.text}")
 
     def get_crossref_metadata(self, doi):
         if doi in self.crossref_metadata_map:
@@ -381,14 +410,14 @@ class DOIParser:
                             author_name,
                             pubyear_start=None,
                             pubyear_end=None,
-                            extra_queries: List[str] = None):
+                            extra_queries: List[str] = None) -> pd.DataFrame:
         """
         Use Scopus API to generate a list of DOIs from an author name with the Affiliation ID from the .env file
         """
 
         BASE_URL = "https://api.elsevier.com/content/search/scopus"
 
-        query_components = [f'AF-ID({SCOPUS_AFFILIATION_ID})']
+        query_components = [f'AF-ID({self.af_id})']
         query_components.append(f'AUTHFIRST("{author_name.split()[0][0]}")')
         query_components.append(f'AUTHOR-NAME("{author_name.split()[-1]}")')
         if pubyear_start:
@@ -432,6 +461,22 @@ class DOIParser:
             return dois
         dois = get_dois()
         return self.filter_dois(dois)
+
+
+    def filter_dois(self, dois: List[str]) -> pd. DataFrame:
+        """
+        Takes list of DOIs, checks if it already exists on PuRe as well as the availability on Crossref and Scopus, returns overview dataframe
+        """
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        results = []
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
+            for future in as_completed(futures):
+                result = future.result()
+                results.append(result)
+        df = pd.DataFrame(results)
+        return df
 
     def fetch_metadata(self, doi):
         """
@@ -484,28 +529,6 @@ class DOIParser:
             'Field': "\n".join(field)
         }
 
-    def filter_dois(self, dois: List[str]) -> pd. DataFrame:
-        """
-        Takes list of DOIs, checks if it already exists on PuRe as well as the availability on Crossref and Scopus, returns overview dataframe
-        """
-        pd.set_option('display.max_rows', None)
-        pd.set_option('display.max_columns', None)
-        results = []
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
-            for future in as_completed(futures):
-                result = future.result()
-                results.append(result)
-        df = pd.DataFrame(results)
-        return df
-        # def highlight_rows(row):
-        #     if "PuRe" in row['Field']:
-        #         return ['background-color: #233333' for _ in row]  # Dark greenish-blue
-        #     elif row['Field']:  # If there's something else in the Field column
-        #         return ['background-color: #433333' for _ in row]  # Dark reddish-brown
-        #     else:
-        #         return ['background-color: #999900' for _ in row]  # Yellowish for empty Field
-        # print(df.style.apply(highlight_rows, axis=1).render())
 
     def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
@@ -519,6 +542,7 @@ class DOIParser:
         The dict maps column data to a tuple, e.g. `"Title": [title, 35)`
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
+        print("df_dois_overview",df_dois_overview)
         if force:
             new_dois = df_dois_overview['DOI'].values
         else:

@@ -31,12 +31,12 @@
             <input type="submit" value="Upload and Create Publications">
         </form>
 
-    <h4>Tracked Authors</h4>
-    <p>Receive regular updates of new publications by these authors:</p>
-    <form method="post" action="{{ url_for('save_tracked_authors') }}">
-        <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter authors, one per line">{{ tracked_authors }}</textarea><br><br>
-        <button type="submit">Save</button>
-    </form>
+        <h4>Tracked Authors</h4>
+        <p>Receive regular updates of new publications by these authors:</p>
+        <form method="post" action="{{ url_for('save_tracked_authors') }}">
+            <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter authors, one per line">{{ tracked_authors }}</textarea><br><br>
+            <button type="submit">Save</button>
+        </form>
     </div>
 
     <!-- Talks and Posters Section -->
@@ -45,9 +45,8 @@
 
         <!-- Download Talks Template -->
         <h4>Download Current Talks Template</h4>
-        <form method="get" action="{{ url_for('download_talks_template') }}">
-            <button type="submit">Download Talks Template</button>
-        </form>
+        <a href="{{ url_for('download_talks_template_public') }}" target="_blank">Download Talks Template</a>
+
 
         <!-- Upload Talks File -->
         <h4>Upload Talks Excel File</h4>

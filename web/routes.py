@@ -12,7 +12,7 @@ from pathlib import Path
 from app import app, login_manager
 from user import User
 
-from update_cache import update_cache
+from misc import update_cache
 from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, PUBMAN_CACHE_DIR
 
 # Initialize your core objects
@@ -148,9 +148,8 @@ def save_tracked_authors():
         flash(f"Error saving authors: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
-@app.route('/download_talks_template', methods=['GET'])
-@login_required
-def download_talks_template():
+@app.route('/download_talks_template_public', methods=['GET'])
+def download_talks_template_public():
     try:
         return send_file(
             TALKS_DIR / 'Template_Talks.xlsx',
@@ -160,8 +159,8 @@ def download_talks_template():
         )
     except Exception as e:
         error_message = traceback.format_exc()
-        flash(f"Error: Unable to download template. Details: {error_message}")
-        return redirect(url_for('dashboard'))
+        app.logger.error(f"Error serving public talks template: {error_message}")
+        return "Error serving the file", 500
 
 @app.route('/create_talks', methods=['POST'])
 @login_required

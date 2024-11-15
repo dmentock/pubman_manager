@@ -1,8 +1,18 @@
 user_3523285:
   ctx_id: ctx_2019354
   org_id: ou_1863336
+  email: d.mentock@mpie.de
   tracked_authors:
   - Baptiste Gault
-  - Franz Roters
-  - Dierk Raabe
-  - Stefan Zaefferer
+  # ignored_dois:
+  # - Franz Roters
+#   - Dierk Raabe
+#   - Stefan Zaefferer
+# user_12345:
+#   ctx_id: ctx_2019354
+#   org_id: ou_1863336
+#   email: d.mentock@mpie.de
+#   tracked_authors:
+#   - Baptiste Gault
+#   - Franz Roters
+#   - Bob Svendsen
