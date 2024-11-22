@@ -22,8 +22,9 @@ import os
 env_path = PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path=env_path)
 
-ENV_USERNAME = os.getenv("USER")
-ENV_PASSWORD = os.getenv("PASSWORD")
+
+ENV_USERNAME = os.getenv("ENV_USER")
+ENV_PASSWORD = os.getenv("ENV_PASSWORD")
 ENV_SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY")
 SCOPUS_AFFILIATION_ID = os.getenv("SCOPUS_AFFILIATION_ID")
 

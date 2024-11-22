@@ -1,0 +1,16 @@
+# Automatically normalize text files to use LF in the repo
+* text=auto
+
+# Specify certain file types to always use LF
+*.sh text eol=lf
+*.py text eol=lf
+
+# Specify certain file types to always use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files should not be converted
+*.jpg binary
+*.png binary
+*.exe binary
+*.zip binary

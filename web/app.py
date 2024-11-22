@@ -7,7 +7,7 @@ import logging
 import yaml
 from pathlib import Path
 
-from routes import doi_parser
+# from routes import doi_parser
 from misc import update_cache
 from pubman_manager import PubmanExtractor, create_sheet
 
@@ -45,10 +45,10 @@ atexit.register(lambda: scheduler.shutdown())
 
 from routes import *
 if __name__ == '__main__':
-    app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Replace with your provider
-    app.config['MAIL_PORT'] = 587
-    app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = 'your_email@example.com'
-    app.config['MAIL_PASSWORD'] = 'your_email_password'
-    mail = Mail(app)
+    # app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Replace with your provider
+    # app.config['MAIL_PORT'] = 587
+    # app.config['MAIL_USE_TLS'] = True
+    # app.config['MAIL_USERNAME'] = 'your_email@example.com'
+    # app.config['MAIL_PASSWORD'] = 'your_email_password'
+    # mail = Mail(app)
     app.run(host='0.0.0.0', debug=True)

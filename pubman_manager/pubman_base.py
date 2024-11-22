@@ -50,7 +50,7 @@ class PubmanBase:
             user_id = decoded_token['id']
             return auth_token, user_id
         else:
-            raise Exception(f"Failed to log in to PuRe: {login_response.text}")
+            raise Exception(f"Failed to log in to PuRe with '{username}': {login_response.text}")
 
     def logout(self):
         logout_response = requests.get(

@@ -4,6 +4,11 @@ import os
 import tempfile
 from flask_mail import Message
 from pathlib import Path
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 from pubman_manager import PubmanExtractor, DOIParser, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
 
@@ -29,60 +34,83 @@ def update_cache(org_id):
     ])
     create_sheet(file_path, names_affiliations, column_details, n_authors, n_entries=45)
 
-def parse_new_publications(email_client, doi_parser):
+def get_file_for_dois(dois, doi_parser):
+    df_dois_overview = doi_parser.filter_dois(dois)
+    dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    doi_parser.write_dois_data(temp_file.name, dois_data)
+    return temp_file.name
+
+def parse_new_publications(doi_parser):
     with open(Path(__file__).parent / 'users.yaml', 'r') as f:
         users = yaml.safe_load(f)
 
     author_publications = {}
-    for author in {author for authors in [users[user]['tracked_authors'] for user in users.keys()] for author in authors}:
-        author_publications[author] = doi_parser.get_dois_for_author(author, pubyear_start=2024)
-
+    dois_by_user = {}
     for user in users:
-        new_dois = []
-        for tracked_author in users[user]['tracked_authors']:
-            df = author_publications[tracked_author]
-            new_dois.extend(
-                df.loc[
-                    ~df['DOI'].isin(users[user].get('ignored_dois', [])) &
-                    (df['Field'].isnull() | (df['Field'] == ""))
-                , 'DOI'].tolist()
-            )
+        dois_by_user[user] = get_user_dois(doi_parser, author_publications=author_publications)
 
-        if new_dois:
-            users[user]['past_dois'] = users[user].get('past_dois', []) + new_dois
-            # Process new DOIs
-            df_dois_overview = doi_parser.filter_dois(new_dois)
-            dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
+def get_user_dois(doi_parser, author_publications=None):
+    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+        users = yaml.safe_load(f)
+    if author_publications is None:
+        author_publications = {}
+    new_dois = []
+    for tracked_author in users[doi_parser.pubman_api.user_id]['tracked_authors']:
+        if tracked_author not in author_publications:
+            author_publications[tracked_author] = doi_parser.get_dois_for_author(tracked_author, pubyear_start=2024)
+        df = author_publications[tracked_author]
+        new_dois.extend(
+            df.loc[
+                ~df['DOI'].isin(users[doi_parser.pubman_api.user_id].get('ignored_dois', [])) &
+                (df['Field'].isnull() | (df['Field'] == "")), 'DOI'].tolist()
+        )
+    return new_dois
 
-            # Create a temporary file
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-            try:
-                # Write the data to the file
-                doi_parser.write_dois_data(temp_file.name, dois_data)
+def send_test_mail_(target):
+    sender_email = 'pubman_manager@mpie.de'
+    recipient_email = target
+    subject = "Test Email"
+    body = "test email sent from pubman_manager"
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    smtp_server = "xmail1.mpie.de"
+    smtp_port = 25
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.sendmail(sender_email, recipient_email, msg.as_string())
 
-                # Prepare and send email
-                email = users[user].get("email")  # Retrieve user email from users.yaml
-                if not email:
-                    print(f"No email configured for user {user}")
-                    continue
+def send_author_publications(doi_parser):
+    new_publication_dois = get_user_dois(doi_parser)
+    print("new_publication_dois", new_publication_dois)
+    temp_file_path = get_file_for_dois(new_publication_dois, doi_parser)
 
-                msg = Message(
-                    subject="New Publications",
-                    sender=doi_parser.pubman_api.user_email,
-                    recipients=[email],
-                    body=f"Dear {user},\n\nNew publications related to your tracked authors have been found. Please revise the attached file and upload it to ___ \n\nBest regards"
-                )
-                with open(temp_file.name, "rb") as attachment:
-                    msg.attach(
-                        filename=os.path.basename(temp_file.name),
-                        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        data=attachment.read()
-                    )
-                email_client.send(msg)
-                print(f"Email sent to {email} with new DOIs for {user}.")
-            finally:
-                os.unlink(temp_file.name)
-        else:
-            print(f"No new DOIs for user {user}")
-    with open(Path(__file__).parent / 'users.yaml', 'w') as f:
-        yaml.dump(users, f)
+    sender_email = 'pubman_manager@mpie.de'
+    recipient_email = doi_parser.pubman_api.user_email
+    subject = "Publication Update"
+    body = f"New publications to import to pubman_manager"
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+    if temp_file_path and os.path.exists(temp_file_path):
+        with open(temp_file_path, "rb") as attachment:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            f"attachment; filename={os.path.basename(temp_file_path)}",
+        )
+        msg.attach(part)
+    else:
+        print(f"Attachment file {temp_file_path} not found or invalid.")
+    smtp_server = "xmail1.mpie.de"
+    smtp_port = 25
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+    print("Email sent successfully.")

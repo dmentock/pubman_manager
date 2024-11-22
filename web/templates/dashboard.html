@@ -33,9 +33,19 @@
 
         <h4>Tracked Authors</h4>
         <p>Receive regular updates of new publications by these authors:</p>
-        <form method="post" action="{{ url_for('save_tracked_authors') }}">
-            <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter authors, one per line">{{ tracked_authors }}</textarea><br><br>
-            <button type="submit">Save</button>
+        <form method="post" action="{{ url_for('send_test_mail') }}">
+          <button type="submit">Send test email</button>
+        </form>
+        <p>Set author list:</p>
+        <form method="post" action="{{ url_for('set_or_send_tracked_authors') }}">
+          <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter <first_name last_name>, one per line">{{ tracked_authors }}</textarea><br><br>
+          <button type="submit" name="action" value="save">Save</button>
+          <button type="submit" name="action" value="send">Send Update Now</button>
+        </form>
+        <p>DOIs to ignore in the future:</p>
+        <form method="post" action="{{ url_for('save_ignored_dois') }}">
+          <textarea name="tracked_authors" rows="10" cols="50" placeholder="10.1103/PhysRevLett.120.246801">{{ ignored_dois_str }}</textarea><br><br>
+          <button type="submit" name="action" value="save">Save</button>
         </form>
     </div>
 

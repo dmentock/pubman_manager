@@ -1,5 +1,5 @@
 # routes.py
-from flask import render_template, redirect, url_for, request, flash, send_file, g, send_from_directory
+from flask import render_template, redirect, url_for, request, flash, send_file, g, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 import logging
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 from app import app, login_manager
 from user import User
 
-from misc import update_cache
+from misc import update_cache, send_test_mail_, send_author_publications, get_file_for_dois
 from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, PUBMAN_CACHE_DIR
 
 # Initialize your core objects
@@ -41,8 +41,10 @@ def login():
         try:
             print("oops")
             username = form.username.data
-            auth_token, user_id = PubmanCreator.login(username, form.password.data)
-            org_id , ctx_id = PubmanCreator.get_user_org_and_ctx(auth_token, user_id)
+            auth_token, user_id, = PubmanCreator.login(username, form.password.data)
+            user_info = PubmanCreator.get_user_info(auth_token, user_id)
+            ctx_id = user_info['ctx_id']
+            org_id = user_info['org_id']
             with open(Path(__file__).parent / 'users.yaml', 'r') as f:
                 users = yaml.safe_load(f)
             if org_id not in {user['org_id'] for user in users.values()}:
@@ -81,14 +83,9 @@ def download_publications_excel():
     if not dois:
         flash('No valid DOIs provided.')
         return redirect(url_for('dashboard'))
-
     try:
-        # Process DOIs and generate Excel
-        df_dois_overview = doi_parser.filter_dois(dois)
-        dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        doi_parser.write_dois_data(temp_file.name, dois_data)
-        return send_file(temp_file.name, as_attachment=True, download_name="publications.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        temp_file_path = get_file_for_dois(dois, doi_parser)
+        return send_file(temp_file_path, as_attachment=True, download_name="publications.xlsx", mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     except Exception as e:
         flash(f"Error processing DOIs: {traceback.format_exc()}")
         return redirect(url_for('dashboard'))
@@ -124,16 +121,29 @@ def create_publications():
 @app.route('/dashboard', methods=['GET'])
 @login_required
 def dashboard():
-    tracked_authors = ['bob', 'aeae']
     with open(Path(__file__).parent / 'users.yaml', 'r') as f:
         users = yaml.safe_load(f)
     tracked_authors = users[pubman_creator.user_id]['tracked_authors']
     tracked_authors_str = "\n".join(tracked_authors)
-    return render_template('dashboard.html', tracked_authors=tracked_authors_str)
+    ignored_dois = users[pubman_creator.user_id]['ignored_dois']
+    ignored_dois_str = "\n".join(ignored_dois)
+    return render_template('dashboard.html', tracked_authors=tracked_authors_str, ignored_dois=ignored_dois_str)
 
-@app.route('/save_tracked_authors', methods=['POST'])
+@app.route('/send_test_mail', methods=['POST'])
 @login_required
-def save_tracked_authors():
+def send_test_mail():
+    try:
+        send_test_mail_(pubman_creator.user_email)
+        flash(f'Test mail sent to {pubman_creator.user_email}')
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        flash(f'Error: {traceback.format_exc()}')
+        return redirect(url_for('dashboard'))
+
+@app.route('/set_or_send_tracked_authors', methods=['POST'])
+@login_required
+def set_or_send_tracked_authors():
+    action = request.form.get('action')
     authors = request.form.get('tracked_authors', '').splitlines()
     authors = [author.strip() for author in authors if author.strip()]
     print("authors", authors)
@@ -146,6 +156,29 @@ def save_tracked_authors():
         flash('Tracked authors updated successfully.')
     except Exception as e:
         flash(f"Error saving authors: {traceback.format_exc()}")
+    if action == 'send':
+        try:
+            flash('Fetching new publications of authors, please wait...')
+            send_author_publications(pubman_creator.user_email)
+        except Exception as e:
+            flash(f"Error updating and sending new publications: {traceback.format_exc()}")
+    return redirect(url_for('dashboard'))
+
+@app.route('/ignored_dois_str', methods=['POST'])
+@login_required
+def ignored_dois_str():
+    ignored_dois = request.form.get('ignored_dois', '').splitlines()
+    ignored_dois = [author.strip() for author in ignored_dois if author.strip()]
+    print("ignored_dois", ignored_dois)
+    try:
+        with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+            users = yaml.safe_load(f)
+        users[pubman_creator.user_id]['ignored_dois'] = ignored_dois
+        with open(Path(__file__).parent / 'users.yaml', 'w') as f:
+            yaml.dump(users, f)
+        flash('DOIS to ignore updated successfully.')
+    except Exception as e:
+        flash(f"Error saving DOIS to ignore: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
 @app.route('/download_talks_template_public', methods=['GET'])
