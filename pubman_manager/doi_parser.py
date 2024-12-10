@@ -380,11 +380,20 @@ class DOIParser:
 
         return processed_affiliations
 
-    def download_pdf(self, pdf_link, doi):
-        """
-        Download PDF for given DOI with Scopus API
-        """
 
+    def download_pdf(self, pdf_link, doi, retries=3):
+        """
+        Download PDF for given DOI with Scopus API, retrying up to `retries` times if a failure occurs.
+
+        Args:
+            pdf_link (str): The link to the PDF.
+            doi (str): The DOI of the article.
+            retries (int): Number of retry attempts.
+            delay (int): Delay (in seconds) between retries.
+
+        Returns:
+            bool: True if the PDF was successfully downloaded, False otherwise.
+        """
         pdf_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
         if pdf_path.exists():
             self.log.debug(f'Pdf path {pdf_path} already exists, skipping...')
@@ -394,17 +403,28 @@ class DOIParser:
             self.log.debug(f"PDF link: {pdf_link}")
             if pdf_link is None:
                 self.log.error(f"No valid PDF link found for DOI: {doi}")
-            else:
-                response = requests.get(pdf_link, stream=True)
-                if response.status_code == 200:
-                    with open(pdf_path, 'wb') as f:
-                        for chunk in response.iter_content(1024):
-                            f.write(chunk)
-                    return True
-                else:
-                    cleaned_html = BeautifulSoup(response.text, "html.parser").text
-                    self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
-        return False
+                return False
+
+            attempt = 0
+            while attempt < retries:
+                try:
+                    response = requests.get(pdf_link, stream=True)
+                    if response.status_code == 200:
+                        with open(pdf_path, 'wb') as f:
+                            for chunk in response.iter_content(1024):
+                                f.write(chunk)
+                        self.log.info(f"Successfully downloaded PDF for DOI: {doi}")
+                        return True
+                    else:
+                        cleaned_html = BeautifulSoup(response.text, "html.parser").text
+                        self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
+                        break  # Stop retrying if the server returns a valid response but not a 200.
+                except requests.exceptions.RequestException as e:
+                    self.log.warning(f"Error downloading PDF on attempt {attempt + 1}: {e}")
+                    attempt += 1
+
+            self.log.error(f"Failed to download PDF after {retries} attempts for DOI: {doi}")
+            return False
 
     def get_dois_for_author(self,
                             author_name,
@@ -593,6 +613,7 @@ class DOIParser:
                               (f"{date_issued_crossref[0][0]}")
                 print("date_issuedct",date_issued)
             cleaned_author_list = self.process_author_list(affiliations_by_name)
+            missing_pdf = True if license_type!='closed' and not pdf_found else False
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
                 "Journal Title": Cell(journal_title, 25),
@@ -607,7 +628,10 @@ class DOIParser:
                 'DOI': Cell(doi, 20),
                 'License url': Cell(license_url if license_type=='open' else '', 20),
                 'License year': Cell(license_year if license_type=='open' else '', 15),
-                'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15),
+                'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15,
+                                  color='red' if missing_pdf else '',
+                                  comment = 'Please upload the file and license info when submitting in PuRe'
+                                  if missing_pdf else ''),
                 'Link': Cell(crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20),
             })
             i = 1
