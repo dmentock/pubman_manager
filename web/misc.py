@@ -50,19 +50,22 @@ def parse_new_publications(doi_parser):
     for user in users:
         dois_by_user[user] = get_user_dois(doi_parser, author_publications=author_publications)
 
-def get_user_dois(doi_parser, author_publications=None):
+def get_user_dois(user_id, doi_parser, author_publications=None):
     with open(Path(__file__).parent / 'users.yaml', 'r') as f:
         users = yaml.safe_load(f)
     if author_publications is None:
         author_publications = {}
-    new_dois = []
-    for tracked_author in users[doi_parser.pubman_api.user_id]['tracked_authors']:
+    new_dois = set()
+    for tracked_author in users[user_id]['tracked_authors']:
         if tracked_author not in author_publications:
             author_publications[tracked_author] = doi_parser.get_dois_for_author(tracked_author, pubyear_start=2024)
         df = author_publications[tracked_author]
-        new_dois.extend(
+        if df.empty:
+            print(f"No data found for author {tracked_author}. Skipping...")
+            continue
+        new_dois.update(
             df.loc[
-                ~df['DOI'].isin(users[doi_parser.pubman_api.user_id].get('ignored_dois', [])) &
+                ~df['DOI'].isin(users[user_id].get('ignored_dois', [])) &
                 (df['Field'].isnull() | (df['Field'] == "")), 'DOI'].tolist()
         )
     return new_dois
@@ -82,13 +85,13 @@ def send_test_mail_(target):
     with smtplib.SMTP(smtp_server, smtp_port) as server:
         server.sendmail(sender_email, recipient_email, msg.as_string())
 
-def send_author_publications(doi_parser):
-    new_publication_dois = get_user_dois(doi_parser)
+def send_author_publications(new_publication_dois, user_email, doi_parser):
+
     print("new_publication_dois", new_publication_dois)
     temp_file_path = get_file_for_dois(new_publication_dois, doi_parser)
 
     sender_email = 'pubman_manager@mpie.de'
-    recipient_email = doi_parser.pubman_api.user_email
+    recipient_email = user_email
     subject = "Publication Update"
     body = f"New publications to import to pubman_manager"
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from app import app, login_manager
 from user import User
 
-from misc import update_cache, send_test_mail_, send_author_publications, get_file_for_dois
+from misc import update_cache, send_test_mail_, send_author_publications, get_file_for_dois, get_user_dois
 from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, PUBMAN_CACHE_DIR
 
 # Initialize your core objects
@@ -125,7 +125,7 @@ def dashboard():
         users = yaml.safe_load(f)
     tracked_authors = users[pubman_creator.user_id]['tracked_authors']
     tracked_authors_str = "\n".join(tracked_authors)
-    ignored_dois = users[pubman_creator.user_id]['ignored_dois']
+    ignored_dois = users[pubman_creator.user_id].get('ignored_dois', [])
     ignored_dois_str = "\n".join(ignored_dois)
     return render_template('dashboard.html', tracked_authors=tracked_authors_str, ignored_dois=ignored_dois_str)
 
@@ -159,7 +159,8 @@ def set_or_send_tracked_authors():
     if action == 'send':
         try:
             flash('Fetching new publications of authors, please wait...')
-            send_author_publications(pubman_creator.user_email)
+            new_publication_dois = get_user_dois(pubman_creator.user_id, doi_parser)
+            send_author_publications(new_publication_dois, pubman_creator.user_email, doi_parser)
         except Exception as e:
             flash(f"Error updating and sending new publications: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))

@@ -22,3 +22,10 @@ nav a {
   margin-bottom: 10px;
   border: 1px solid #f5c6cb;
 }
+
+.h4-summary {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin-bottom: 0.5em;
+  cursor: pointer;
+}
