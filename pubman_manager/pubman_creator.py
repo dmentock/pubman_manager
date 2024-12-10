@@ -279,50 +279,50 @@ class PubmanCreator(PubmanBase):
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
             if self.clean_scalar(row.get('License url')):
                 if not pdf_path.exists():
-                    raise RuntimeError(f'PDF for DOI {doi} not found in {pdf_path}')
+                    self.log.error(f'PDF for DOI {doi} not found in {pdf_path}')
                 else:
-                  file_id = self.upload_pdf(pdf_path)
-                  file =  {
-                      "objectId": '',
-                      "name": pdf_path.name,
-                      "lastModificationDate" : "",
-                      "creationDate" : "",
-                      "creator" : {
-                        "objectId" : ""
-                      },
-                      "pid" : "",
-                      'content': file_id,
-                      "visibility": "PUBLIC",
-                      "contentCategory": "publisher-version",
-                      "checksum" : "",
-                      "checksumAlgorithm" : "MD5",
-                      "mimeType" : "",
-                      "size" : 0,
-                      'storage': 'INTERNAL_MANAGED',
-                      "metadata" : {
-                        "title" : pdf_path.name,
-                        "description" : "File downloaded from scopus",
-                        "formats" : [ {
-                          "value" : "",
-                          "type" : ""
-                        } ],
+                    file_id = self.upload_pdf(pdf_path)
+                    file =  {
+                        "objectId": '',
+                        "name": pdf_path.name,
+                        "lastModificationDate" : "",
+                        "creationDate" : "",
+                        "creator" : {
+                          "objectId" : ""
+                        },
+                        "pid" : "",
+                        'content': file_id,
+                        "visibility": "PUBLIC",
+                        "contentCategory": "publisher-version",
+                        "checksum" : "",
+                        "checksumAlgorithm" : "MD5",
+                        "mimeType" : "",
                         "size" : 0,
-                      },
-                  }
-                  license_url = row.get('License url', '')
-                  license_year = row.get('License year', '')
-                  if (license_url and not isinstance(license_url, float)) or (isinstance(license_url, float) and not math.isnan(license_url)):
-                      file['metadata']['license'] = license_url
-                  else:
-                      license_url = ''
-                  if license_year and license_year!=license_year:
-                      try:
-                          license_year = str(int(license_year))
-                          file['metadata']['copyrightDate'] = license_year
-                      except:
-                          pass
-                  file['metadata']['contentCategory'] = 'pre-print' if 'arxiv' in license_url else 'publisher-version'
-                  files.append(file)
+                        'storage': 'INTERNAL_MANAGED',
+                        "metadata" : {
+                          "title" : pdf_path.name,
+                          "description" : "File downloaded from scopus",
+                          "formats" : [ {
+                            "value" : "",
+                            "type" : ""
+                          } ],
+                          "size" : 0,
+                        },
+                    }
+                    license_url = row.get('License url', '')
+                    license_year = row.get('License year', '')
+                    if (license_url and not isinstance(license_url, float)) or (isinstance(license_url, float) and not math.isnan(license_url)):
+                        file['metadata']['license'] = license_url
+                    else:
+                        license_url = ''
+                    if license_year and license_year!=license_year:
+                        try:
+                            license_year = str(int(license_year))
+                            file['metadata']['copyrightDate'] = license_year
+                        except:
+                            pass
+                    file['metadata']['contentCategory'] = 'pre-print' if 'arxiv' in license_url else 'publisher-version'
+                    files.append(file)
 
             request = {
                 "context": {
