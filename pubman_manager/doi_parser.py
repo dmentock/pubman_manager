@@ -432,11 +432,12 @@ class DOIParser:
                             pubyear_end=None,
                             extra_queries: List[str] = None) -> pd.DataFrame:
         """
-        Use Scopus API to generate a list of DOIs from an author name with the Affiliation ID from the .env file
+        Use Scopus and Crossref APIs to generate a list of DOIs for an author.
         """
+        BASE_SCOPUS_URL = "https://api.elsevier.com/content/search/scopus"
+        BASE_CROSSREF_URL = "https://api.crossref.org/works"
 
-        BASE_URL = "https://api.elsevier.com/content/search/scopus"
-
+        # Build the Scopus query
         query_components = [f'AF-ID({self.af_id})']
         query_components.append(f'AUTHFIRST("{author_name.split()[0][0]}")')
         query_components.append(f'AUTHOR-NAME("{author_name.split()[-1]}")')
@@ -450,23 +451,26 @@ class DOIParser:
         query = ' AND '.join(query_components)
         if not query:
             raise ValueError("At least one search parameter must be provided.")
-        headers = {
+
+        # Define headers and params for Scopus
+        scopus_headers = {
             "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
             "Accept": "application/json"
         }
-        params = {
+        scopus_params = {
             "query": query,
             "field": "doi",
             "count": 200,
             "start": 0
         }
-        def get_dois():
+
+        def get_dois_scopus():
             dois = []
             start = 0
             total_results = 1
             while start < total_results:
-                params['start'] = start
-                response = requests.get(BASE_URL, headers=headers, params=params)
+                scopus_params['start'] = start
+                response = requests.get(BASE_SCOPUS_URL, headers=scopus_headers, params=scopus_params)
                 if response.status_code == 200:
                     data = response.json()
                     total_results = int(data['search-results']['opensearch:totalResults'])
@@ -479,76 +483,126 @@ class DOIParser:
                 else:
                     raise RuntimeError(f"Scopus query API error {response.status_code}: {response.text}")
             return dois
-        dois = get_dois()
-        return self.filter_dois(dois)
+
+        def get_dois_crossref():
+            dois = []
+            crossref_params = {
+                "query.author": author_name,
+                "filter": [],
+                "rows": 1000
+            }
+            if pubyear_start:
+                crossref_params["filter"].append(f"from-pub-date:{pubyear_start}")
+            if pubyear_end:
+                crossref_params["filter"].append(f"until-pub-date:{pubyear_end}")
+            crossref_params["filter"] = ",".join(crossref_params["filter"])
+
+            response = requests.get(BASE_CROSSREF_URL, params=crossref_params)
+            if response.status_code == 200:
+                data = response.json()
+                items = data.get('message', {}).get('items', [])
+                for item in items:
+                    doi = item.get('DOI')
+                    if doi:
+                        dois.append(doi)
+            else:
+                raise RuntimeError(f"Crossref query API error {response.status_code}: {response.text}")
+            return dois
+
+        # Fetch DOIs from both sources
+        scopus_dois = get_dois_scopus()
+        crossref_dois = get_dois_crossref()
+
+        return self.filter_dois(crossref_dois, scopus_dois)
 
 
-    def filter_dois(self, dois: List[str]) -> pd. DataFrame:
+    def filter_dois(self, dois_crossref: List[str], dois_scopus: List[str]) -> pd.DataFrame:
         """
-        Takes list of DOIs, checks if it already exists on PuRe as well as the availability on Crossref and Scopus, returns overview dataframe
+        Takes lists of DOIs from Crossref and Scopus, checks their availability, and returns an overview DataFrame.
+
+        Args:
+            dois_crossref (List[str]): List of DOIs to check on Crossref.
+            dois_scopus (List[str]): List of DOIs to check on Scopus.
+
+        Returns:
+            pd.DataFrame: DataFrame with 'DOI', 'crossref', and 'scopus' columns.
         """
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
-        results = []
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = [executor.submit(self.fetch_metadata, doi) for doi in dois]
+
+        # Dictionary to store results for each DOI
+        results: Dict[str, Dict[str, bool]] = {}
+
+        # Helper function to process metadata
+        def process_metadata(source, doi):
+            if source == 'crossref':
+                metadata = self.fetch_crossref_metadata(doi)
+                return doi, {'crossref': bool(metadata)}
+            elif source == 'scopus':
+                metadata = self.fetch_scopus_metadata(doi)
+                return doi, {'scopus': bool(metadata)}
+
+        # Fetch Crossref metadata
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(process_metadata, 'crossref', doi): doi for doi in dois_crossref}
             for future in as_completed(futures):
-                result = future.result()
-                results.append(result)
-        df = pd.DataFrame(results)
+                doi, crossref_result = future.result()
+                results.setdefault(doi, {'crossref': False, 'scopus': False}).update(crossref_result)
+
+        # Fetch Scopus metadata
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {executor.submit(process_metadata, 'scopus', doi): doi for doi in dois_scopus}
+            for future in as_completed(futures):
+                doi, scopus_result = future.result()
+                results.setdefault(doi, {'crossref': False, 'scopus': False}).update(scopus_result)
+
+        # Convert results to DataFrame
+        df = pd.DataFrame.from_dict(results, orient='index').reset_index()
+        df.rename(columns={'index': 'DOI'}, inplace=True)
         return df
 
-    def fetch_metadata(self, doi):
-        """
-        Helper function to parallelize `filter_dois` method
-        """
+    def fetch_crossref_metadata(self, doi):
+        """Fetch metadata from Crossref for the given DOI."""
+        crossref_metadata = self.get_crossref_metadata(doi)
+        title = crossref_metadata.get('title', [None])[0] if crossref_metadata else 'Unknown Title'
+        publication_date = crossref_metadata.get('published-online', {}).get('date-parts', [None])[0] if crossref_metadata else 'Unknown Date'
+        return {
+            'Title': title,
+            'Publication Date': publication_date,
+            'DOI': doi,
+            'Source': 'Crossref'
+        }
+
+    def fetch_scopus_metadata(self, doi):
+        """Fetch metadata from Scopus for the given DOI."""
+        scopus_metadata = self.get_scopus_metadata(doi)
         field = []
-        title = ""
-        publication_date = ""
-
-        pub = self.pubman_api.search_publication_by_criteria({
-            "metadata.identifiers.id": doi,
-            "metadata.identifiers.type": 'DOI'
-        })
-
         title = 'Unknown Title'
-        publication_date = 'Unknonw Date'
-        if pub:
-            field.append("Already exists in PuRe")
-            title = pub[0].get('data', {}).get('metadata', {}).get('title', 'Title not specified in PuRe')
-            publication_date = pub[0].get('data', {}).get('metadata', {}).get('datePublishedInPrint', 'Date not specified in PuRe')
+        publication_date = 'Unknown Date'
+
+        if scopus_metadata:
+            # Example of processing Scopus metadata (uncomment and customize as needed)
+            author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+            is_mp_publication = False
+            for _, affiliations in author_affiliation_map.items():
+                for affiliation in affiliations:
+                    if self.is_mpi_affiliation(affiliation):
+                        is_mp_publication = True
+                        break
+                if is_mp_publication:
+                    break
+            if not is_mp_publication:
+                field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
         else:
-            crossref_metadata = self.get_crossref_metadata(doi)
-            scopus_metadata = self.get_scopus_metadata(doi)
-
-            # if not scopus_metadata:
-            #     field.append('Publication not found on Scopus')
-            # else:
-                # author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
-                # is_mp_publication = False
-                # for _, affiliations in author_affiliation_map.items():
-                #     for affiliation in affiliations:
-                #         print(_, affiliation)
-                #         # Scopus sometimes has a Max Plank typo
-                #         if self.is_mpi_affiliation(affiliation):
-                #             is_mp_publication = True
-                #             break
-                #     if is_mp_publication:
-                #         break
-                # if not is_mp_publication:
-                #     field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
-
-            if crossref_metadata:
-                title = crossref_metadata.get('title', [None])[0]
-                publication_date = crossref_metadata.get('published-online', {}).get('date-parts', [None])[0]
+            field.append('Publication not found on Scopus')
 
         return {
             'Title': title,
             'Publication Date': publication_date,
             'DOI': doi,
-            'Field': "\n".join(field)
+            'Field': "\n".join(field),
+            'Source': 'Scopus'
         }
-
 
     def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
@@ -559,7 +613,7 @@ class DOIParser:
         ------
 
         Each entry in the result list is a dict that corresponds to a publication.
-        The dict maps column data to a tuple, e.g. `"Title": [title, 35)`
+        The dict maps column data to a tuple, e.g. `"Title": (title, 35)`
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
         print("df_dois_overview",df_dois_overview)
@@ -568,7 +622,8 @@ class DOIParser:
         else:
             new_dois = df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]['DOI'].values
         dois_data = []
-        for doi in new_dois:
+        for index, row in df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')].iterrows():
+            doi = row['DOI']
             self.log.debug("Processing Publication DOI {doi}")
             crossref_metadata = self.get_crossref_metadata(doi)
             if not crossref_metadata:
