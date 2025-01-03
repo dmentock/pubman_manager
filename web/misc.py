@@ -9,8 +9,9 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+import logging
 
-from pubman_manager import PubmanExtractor, DOIParser, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
+from pubman_manager import PubmanBase, PubmanExtractor, DOIParser, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
 
 extractor = PubmanExtractor()
 
@@ -36,6 +37,7 @@ def update_cache(org_id):
 
 def get_file_for_dois(dois, doi_parser):
     df_dois_overview = doi_parser.filter_dois(dois)
+    print("df_dois_overview",df_dois_overview)
     dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     doi_parser.write_dois_data(temp_file.name, dois_data)
@@ -117,3 +119,23 @@ def send_author_publications(new_publication_dois, user_email, doi_parser):
     with smtplib.SMTP(smtp_server, smtp_port) as server:
         server.sendmail(sender_email, recipient_email, msg.as_string())
     print("Email sent successfully.")
+
+def send_publications():
+    pass
+
+def run_periodic_task():
+    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+        users = yaml.safe_load(f)
+    for org_id in {users[user_id]['org_id'] for user_id in users.keys()}:
+        update_cache(org_id)
+
+    for user_id, user_info in users.items():
+        pubman_api = PubmanBase()
+        parser = DOIParser(pubman_api, logging_level = logging.DEBUG)
+        new_publication_dois = get_user_dois(user_id, parser)
+        if new_publication_dois:
+            logging.info(f'Processing new DOIS for user {user_id} ({user_info}):')
+            logging.info(f'{new_publication_dois}')
+            send_author_publications(new_publication_dois, user_info['email'], parser)
+        else:
+            logging.info(f'No new DOIS for user {user_info['email']} (tracking {user_info['tracked_authors']})')

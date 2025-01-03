@@ -28,8 +28,11 @@ ENV_PASSWORD = os.getenv("ENV_PASSWORD")
 ENV_SCOPUS_API_KEY = os.getenv("SCOPUS_API_KEY")
 SCOPUS_AFFILIATION_ID = os.getenv("SCOPUS_AFFILIATION_ID")
 
+from .util import *
 from .excel_generator import create_sheet, Cell
 from .pubman_base import PubmanBase
 from .pubman_creator import PubmanCreator
 from .pubman_extractor import PubmanExtractor
 from .doi_parser import DOIParser
+from .api_manager_scopus import ScopusManager
+from .api_manager_crossref import CrossrefManager

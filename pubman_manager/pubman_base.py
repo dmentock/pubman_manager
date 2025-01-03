@@ -251,8 +251,8 @@ class PubmanBase:
 
         headers = self.headers_json
 
-        print("headers",headers)
-        print("query",query)
+        # print("headers",headers)
+        # print("query",query)
         response = requests.post(
             f"{self.base_url}/items/search",
             headers=headers,
