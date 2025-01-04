@@ -9,10 +9,11 @@ from urllib.parse import urlencode
 from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, is_mpi_affiliation
 
 class ScopusManager:
-    def __init__(self, api_key = None, logging_level = logging.INFO):
+    def __init__(self, org_name, api_key = None, logging_level = logging.INFO):
         self.log = logging.getLogger(__name__)
         self.log.setLevel(logging_level)
         self.api_key = api_key if api_key else ENV_SCOPUS_API_KEY
+        self.org_name = org_name
         self.metadata_map = {}
         self.af_id_ = None
 
@@ -22,7 +23,7 @@ class ScopusManager:
             return self.af_id_
         BASE_URL = "https://api.elsevier.com/content/search/affiliation"
         params = {
-            "query": f"AFFIL({self.pubman_api.org_name})"
+            "query": f"AFFIL({self.org_name})"
         }
         encoded_params = urlencode(params)
         headers = {
@@ -63,15 +64,15 @@ class ScopusManager:
 
     def get_overview(self, doi):
         """Fetch overview from Scopus for the given DOI."""
-        scopus_metadata = self.get_scopus_metadata(doi)
+        scopus_metadata = self.get_metadata(doi)
         field = []
         title = 'Unknown Title'
         publication_date = 'Unknown Date'
 
         if scopus_metadata:
-            author_affiliation_map = self.extract_scopus_authors_affiliations(scopus_metadata)
+            author_affiliation_map = self.extract_authors_affiliations(scopus_metadata)
             is_mp_publication = False
-            for _, affiliations in author_affiliation_map.items():
+            for affiliations in author_affiliation_map.values():
                 for affiliation in affiliations:
                     if is_mpi_affiliation(affiliation):
                         is_mp_publication = True
@@ -82,8 +83,9 @@ class ScopusManager:
                 field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
         else:
             field.append('Publication not found on Scopus')
+            return doi, {}
 
-        return {
+        return doi, {
             'Title': title,
             'Publication Date': publication_date,
             'Field': "\n".join(field),
@@ -161,57 +163,12 @@ class ScopusManager:
             if '.' in first_name:
                 author_id = author.get('author-url', '/').split('/')[-1]
                 if author_id:
-                    first_name, surname = self.get_scopus_author_full_name(author_id)
-            full_name = self.process_name(self.affiliations_by_name_pubman.keys(), first_name, surname)
+                    first_name, surname = self.get_author_full_name(author_id)
             author_id = author.get('@auid', '')
             affiliations = author_id_to_affiliations.get(author_id, ['No affiliation available'])
             unique_affiliations = list(OrderedDict.fromkeys(affiliations))
-            author_affiliation_map[full_name] = unique_affiliations
+            author_affiliation_map[(first_name, surname)] = unique_affiliations
         return author_affiliation_map
-
-    def download_pdf(self, pdf_link, doi, retries=3):
-        """
-        Download PDF for given DOI with Scopus API, retrying up to `retries` times if a failure occurs.
-
-        Args:
-            pdf_link (str): The link to the PDF.
-            doi (str): The DOI of the article.
-            retries (int): Number of retry attempts.
-            delay (int): Delay (in seconds) between retries.
-
-        Returns:
-            bool: True if the PDF was successfully downloaded, False otherwise.
-        """
-        pdf_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
-        if pdf_path.exists():
-            self.log.debug(f'Pdf path {pdf_path} already exists, skipping...')
-            return True
-        else:
-            self.log.debug(f"Attempting to download PDF for DOI: {doi}")
-            self.log.debug(f"PDF link: {pdf_link}")
-            if pdf_link is None:
-                self.log.error(f"No valid PDF link found for DOI: {doi}")
-                return False
-            attempt = 0
-            while attempt < retries:
-                try:
-                    response = requests.get(pdf_link, stream=True)
-                    if response.status_code == 200:
-                        with open(pdf_path, 'wb') as f:
-                            for chunk in response.iter_content(1024):
-                                f.write(chunk)
-                        self.log.info(f"Successfully downloaded PDF for DOI: {doi}")
-                        return True
-                    else:
-                        cleaned_html = BeautifulSoup(response.text, "html.parser").text
-                        self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
-                        break  # Stop retrying if the server returns a valid response but not a 200.
-                except requests.exceptions.RequestException as e:
-                    self.log.warning(f"Error downloading PDF on attempt {attempt + 1}: {e}")
-                    attempt += 1
-
-            self.log.error(f"Failed to download PDF after {retries} attempts for DOI: {doi}")
-            return False
 
     def get_dois_for_author(self,
                             author_name,
@@ -225,8 +182,10 @@ class ScopusManager:
 
         # Build the Scopus query
         query_components = [f'AF-ID({self.af_id})']
-        query_components.append(f'AUTHFIRST("{author_name.split()[0][0]}")')
-        query_components.append(f'AUTHOR-NAME("{author_name.split()[-1]}")')
+        first_name, last_name = author_name.split(' ')[0], ' '.join(author_name.split(' ')[1:])
+
+        query_components.append(f'AUTHFIRST("{first_name}")')
+        query_components.append(f'AUTHOR-NAME("{last_name}")')
         if pubyear_start:
             query_components.append(f'PUBYEAR > {pubyear_start - 1}')
         if pubyear_end:
