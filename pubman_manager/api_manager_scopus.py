@@ -10,18 +10,23 @@ from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, is_mpi_affiliation
 
 logger = logging.getLogger(__name__)
 
+BASE_URL =             "https://api.elsevier.com/content"
+BASE_AUTHOR_URL =      f"{BASE_URL}/search/author"
+BASE_AFFILIATION_URL = f"{BASE_URL}/search/affiliation"
+BASE_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
+
 class ScopusManager:
     def __init__(self, org_name, api_key = None):
         self.api_key = api_key if api_key else ENV_SCOPUS_API_KEY
         self.org_name = org_name
         self.metadata_map = {}
         self.af_id_ = None
+        self.author_id_map = {}
 
     @property
     def af_id(self):
         if self.af_id_:
             return self.af_id_
-        BASE_URL = "https://api.elsevier.com/content/search/affiliation"
         params = {
             "query": f"AFFIL({self.org_name})"
         }
@@ -30,7 +35,7 @@ class ScopusManager:
             "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
             "Accept": "application/json"
         }
-        response = requests.get(f"{BASE_URL}?{encoded_params}", headers=headers)
+        response = requests.get(f"{BASE_AFFILIATION_URL}?{encoded_params}", headers=headers)
         if response.status_code == 200:
             data = response.json()
             if "search-results" in data and "entry" in data["search-results"]:
@@ -173,36 +178,57 @@ class ScopusManager:
             author_affiliation_map[(first_name, surname)] = unique_affiliations
         return author_affiliation_map
 
+    def get_author_id(self, author_name: str) -> str:
+        """
+        Retrieve the Scopus Author ID for the specified author.
+        """
+        if author_name not in self.author_id_map:
+            first_name, last_name = author_name.split(' ')[0], ' '.join(author_name.split(' ')[1:])
+            query = f'AF-ID({self.af_id}) AND AUTHFIRST("{first_name}") AND AUTHOR-NAME("{last_name}")'
+
+            headers = {
+                "X-ELS-APIKey": self.api_key,
+                "Accept": "application/json"
+            }
+            params = {
+                "query": query,
+                "field": "author-id",
+                "count": 1
+            }
+
+            response = requests.get(BASE_AUTHOR_URL, headers=headers, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                entries = data['search-results'].get('entry', [])
+                if entries:
+                    self.author_id_map[author_name] = entries[0].get('dc:identifier').split(':')[-1]
+                else:
+                    raise ValueError("Author not found in Scopus.")
+            else:
+                raise RuntimeError(f"Scopus Author query API error {response.status_code}: {response.text}")
+        return self.author_id_map[author_name]
+
     def get_dois_for_author(self,
                             author_name,
                             pubyear_start=None,
                             pubyear_end=None,
                             extra_queries: List[str] = None) -> pd.DataFrame:
         """
-        Use Scopus API to generate a list of DOIs for an author.
+        Use Scopus API to generate a list of DOIs for an author using their Author ID.
         """
-        BASE_SCOPUS_URL = "https://api.elsevier.com/content/search/scopus"
-
-        # Build the Scopus query
-        query_components = [f'AF-ID({self.af_id})']
-        first_name, last_name = author_name.split(' ')[0], ' '.join(author_name.split(' ')[1:])
-
-        query_components.append(f'AUTHFIRST("{first_name[0]}.")')
-        query_components.append(f'AUTHOR-NAME("{last_name}")')
+        author_id = self.get_author_id(author_name)
+        query_components = [f'AU-ID({author_id})']
         if pubyear_start:
             query_components.append(f'PUBYEAR > {pubyear_start - 1}')
         if pubyear_end:
             query_components.append(f'PUBYEAR < {pubyear_end + 1}')
         if extra_queries:
-            for extra_query in extra_queries:
-                query_components.append(extra_query)
-        query = ' AND '.join(query_components)
-        if not query:
-            raise ValueError("At least one search parameter must be provided.")
+            query_components.extend(extra_queries)
 
-        # Define headers and params for Scopus
+        query = ' AND '.join(query_components)
+
         headers = {
-            "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
+            "X-ELS-APIKey": self.api_key,
             "Accept": "application/json"
         }
         params = {
@@ -217,9 +243,7 @@ class ScopusManager:
         total_results = 1
         while start < total_results:
             params['start'] = start
-            logger.debug(f'Making Scopus request {start}: headers={headers}, params={params}')
-            response = requests.get(BASE_SCOPUS_URL, headers=headers, params=params)
-            logger.debug(f'Scopus response: {response.status_code}')
+            response = requests.get(BASE_SEARCH_URL, headers=headers, params=params)
 
             if response.status_code == 200:
                 data = response.json()
@@ -235,4 +259,3 @@ class ScopusManager:
             else:
                 raise RuntimeError(f"Scopus query API error {response.status_code}: {response.text}")
         return dois
-
