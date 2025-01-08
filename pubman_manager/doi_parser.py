@@ -20,11 +20,9 @@ from urllib.parse import urlencode
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
 
 class DOIParser:
-    def __init__(self, pubman_api, scopus_api_key = None, logging_level = logging.INFO):
-        self.log = logging.getLogger(__name__)
-        self.log.setLevel(logging_level)
-        self.crossref_manager = CrossrefManager(logging_level=logging_level)
-        self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key, logging_level=logging_level)
+    def __init__(self, pubman_api, scopus_api_key = None):
+        self.crossref_manager = CrossrefManager()
+        self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key)
 
         self.pubman_api = pubman_api
         with open(PUBMAN_CACHE_DIR / pubman_api.org_id / 'authors_info.yaml', 'r', encoding='utf-8') as f:
@@ -296,18 +294,34 @@ class DOIParser:
                 results.setdefault(doi, {'crossref': False, 'scopus': False}).update(crossref_result)
 
         dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start=pubyear_start, pubyear_end=pubyear_end)
+        print("dois_scopus",dois_scopus)
         with ThreadPoolExecutor(max_workers=1) as executor:
             futures = {executor.submit(self.scopus_manager.get_overview, doi): doi for doi in dois_scopus}
             for future in as_completed(futures):
                 doi, scopus_result = future.result()
                 if existing_entry:=results.get(doi):
                     existing_field = existing_entry.get('Field', '')
-                    scopus_result['Field'] = existing_field + '\n' + scopus_result['Field']
+                    scopus_result['Field'] = existing_field + '\n' + scopus_result.get('Field', '')
                 results.setdefault(doi, {'crossref': False, 'scopus': False}).update(scopus_result)
 
-        # Convert results to DataFrame
+        for doi in results.keys():
+            pub = self.pubman_api.search_publication_by_criteria({
+                "metadata.identifiers.id": doi,
+                "metadata.identifiers.type": 'DOI'
+            })
+            if pub:
+                results[doi]['Field'] = (results[doi].setdefault('Field', '') + "\nAlready exists in PuRe").strip()
+            if results[doi].get('Publication Date'):
+                date = self.parse_date(results[doi]['Publication Date'])
+                results[doi]['Publication Date'] = pd.to_datetime(
+                    date, format='%d.%m.%Y', errors='coerce'
+                )
+            else:
+                results[doi]['Publication Date'] = pd.NaT
+
         df = pd.DataFrame.from_dict(results, orient='index').reset_index()
         df.rename(columns={'index': 'DOI'}, inplace=True)
+        df = df.sort_values('Publication Date')
         return df
 
     def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:

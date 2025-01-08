@@ -8,10 +8,10 @@ from urllib.parse import urlencode
 
 from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, is_mpi_affiliation
 
+logger = logging.getLogger(__name__)
+
 class ScopusManager:
-    def __init__(self, org_name, api_key = None, logging_level = logging.INFO):
-        self.log = logging.getLogger(__name__)
-        self.log.setLevel(logging_level)
+    def __init__(self, org_name, api_key = None):
         self.api_key = api_key if api_key else ENV_SCOPUS_API_KEY
         self.org_name = org_name
         self.metadata_map = {}
@@ -55,21 +55,27 @@ class ScopusManager:
                 response = requests.get(url + doi, headers=headers)
                 response.raise_for_status()
                 self.metadata_map[doi] = response.json()
-                self.log.debug(f'scopus_metadata {response.json()}')
+                logger.debug(f'scopus_metadata {response.json()}')
                 return response.json()
             except requests.HTTPError as e:
-                self.log.error(f"Failed to retrieve Scopus data for DOI {doi}: {e}")
+                logger.error(f"Failed to retrieve Scopus data for DOI {doi}: {e}")
                 return None
         return self.metadata_map[doi]
 
     def get_overview(self, doi):
         """Fetch overview from Scopus for the given DOI."""
         scopus_metadata = self.get_metadata(doi)
-        field = []
-        title = 'Unknown Title'
-        publication_date = 'Unknown Date'
-
+        logger.debug(scopus_metadata)
+        overview = {}
+        overview['scopus'] = False
         if scopus_metadata:
+            # Fetch title and publication date from scopus_metadata
+            title = scopus_metadata['abstracts-retrieval-response']['coredata'].get('dc:title', 'Unknown Title')
+            if title:
+                overview['Title']  = title
+            publication_date = scopus_metadata['abstracts-retrieval-response']['coredata'].get('prism:coverDate', 'Unknown Date')
+            if publication_date:
+                overview['Publication Date'] = publication_date
             author_affiliation_map = self.extract_authors_affiliations(scopus_metadata)
             is_mp_publication = False
             for affiliations in author_affiliation_map.values():
@@ -80,17 +86,14 @@ class ScopusManager:
                 if is_mp_publication:
                     break
             if not is_mp_publication:
-                field.append(f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation')
+                overview['Field'] = f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation'
+            scopus_id = scopus_metadata['abstracts-retrieval-response']['coredata']['prism:url'].split('/')[-1]
+            overview['scopus'] = f"https://www.scopus.com/inward/record.uri?partnerID=HzOxMe3b&scp={scopus_id}&origin=inward"
         else:
-            field.append('Publication not found on Scopus')
-            return doi, {}
+            overview['Field'] = 'Publication not found on Scopus'
+        return doi, overview
 
-        return doi, {
-            'Title': title,
-            'Publication Date': publication_date,
-            'Field': "\n".join(field),
-            'scopus': True
-        }
+
 
     def get_author_full_name(self, author_id):
         author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
@@ -184,7 +187,7 @@ class ScopusManager:
         query_components = [f'AF-ID({self.af_id})']
         first_name, last_name = author_name.split(' ')[0], ' '.join(author_name.split(' ')[1:])
 
-        query_components.append(f'AUTHFIRST("{first_name}")')
+        query_components.append(f'AUTHFIRST("{first_name[0]}.")')
         query_components.append(f'AUTHOR-NAME("{last_name}")')
         if pubyear_start:
             query_components.append(f'PUBYEAR > {pubyear_start - 1}')
@@ -214,9 +217,14 @@ class ScopusManager:
         total_results = 1
         while start < total_results:
             params['start'] = start
+            logger.debug(f'Making Scopus request {start}: headers={headers}, params={params}')
             response = requests.get(BASE_SCOPUS_URL, headers=headers, params=params)
+            logger.debug(f'Scopus response: {response.status_code}')
+
             if response.status_code == 200:
                 data = response.json()
+                logger.debug(f'Scopus data: {data}')
+
                 total_results = int(data['search-results']['opensearch:totalResults'])
                 entries = data['search-results'].get('entry', [])
                 for entry in entries:

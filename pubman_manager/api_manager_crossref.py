@@ -7,9 +7,7 @@ from typing import List, Dict, Tuple, Any
 import logging
 
 class CrossrefManager:
-    def __init__(self, scopus_api_key = None, logging_level = logging.INFO):
-        self.log = logging.getLogger(__name__)
-        self.log.setLevel(logging_level)
+    def __init__(self, scopus_api_key = None):
         self.metadata_map = {}
 
     def get_metadata(self, doi):
@@ -32,7 +30,7 @@ class CrossrefManager:
         return doi, {
             'Title': title,
             'Publication Date': publication_date,
-            'crossref': True
+            'crossref': f"https://doi.org/{doi}"
         }
 
     def extract_authors_affiliations(self, crossref_metadata):
@@ -66,7 +64,7 @@ class CrossrefManager:
             params["filter"].append(f"from-pub-date:{pubyear_start}")
         if pubyear_end:
             params["filter"].append(f"until-pub-date:{pubyear_end}")
-        params["filter"].append("has-affiliation:true")
+        # params["filter"].append("has-affiliation:true")
         params["filter"] = ",".join(params["filter"])
 
         response = requests.get(BASE_CROSSREF_URL, params=params)
