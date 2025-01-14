@@ -294,7 +294,6 @@ class DOIParser:
                 results.setdefault(doi, {'crossref': False, 'scopus': False}).update(crossref_result)
 
         dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start=pubyear_start, pubyear_end=pubyear_end)
-        print("dois_scopus",dois_scopus)
         with ThreadPoolExecutor(max_workers=1) as executor:
             futures = {executor.submit(self.scopus_manager.get_overview, doi): doi for doi in dois_scopus}
             for future in as_completed(futures):

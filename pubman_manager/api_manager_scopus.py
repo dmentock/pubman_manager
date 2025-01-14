@@ -32,9 +32,12 @@ class ScopusManager:
         }
         encoded_params = urlencode(params)
         headers = {
-            "X-ELS-APIKey": ENV_SCOPUS_API_KEY,
+            "X-ELS-APIKey": self.api_key,
             "Accept": "application/json"
         }
+        print("BASE_AUTHOR_URL",BASE_AUTHOR_URL)
+        print("headers",headers)
+        print("params",params)
         response = requests.get(f"{BASE_AFFILIATION_URL}?{encoded_params}", headers=headers)
         if response.status_code == 200:
             data = response.json()
@@ -45,9 +48,9 @@ class ScopusManager:
                     self.af_id_ = af_id
                     return af_id
             else:
-                raise RuntimeError(f"Scopus API request to get AF-ID from '{self.pubman_api.org_name}' unsuccessful, unexpected datastructure: {data}")
+                raise RuntimeError(f"Scopus API request to get AF-ID unsuccessful, unexpected datastructure: {data}")
         else:
-            raise RuntimeError(f"Scopus API request to get AF-ID from '{self.pubman_api.org_name}' unsuccessful: {response.status_code} - {response.text}")
+            raise RuntimeError(f"Scopus API request to get AF-ID unsuccessful: {response.status_code} - {response.text}")
 
     def get_metadata(self, doi):
         if doi not in self.metadata_map:
@@ -70,7 +73,6 @@ class ScopusManager:
     def get_overview(self, doi):
         """Fetch overview from Scopus for the given DOI."""
         scopus_metadata = self.get_metadata(doi)
-        logger.debug(scopus_metadata)
         overview = {}
         overview['scopus'] = False
         if scopus_metadata:
@@ -184,21 +186,26 @@ class ScopusManager:
         """
         if author_name not in self.author_id_map:
             first_name, last_name = author_name.split(' ')[0], ' '.join(author_name.split(' ')[1:])
-            query = f'AF-ID({self.af_id}) AND AUTHFIRST("{first_name}") AND AUTHOR-NAME("{last_name}")'
-
+            # query = f'AUTHFIRST("{first_name}") AND AUTHLASTNAME("{last_name}")'
+            # print("AFID", self.af_id)
+            # TODO: Make generic or relax criteria
+            query = f'AUTHLASTNAME("{last_name}") AND AUTHFIRST("{first_name}") AND (AFFIL("Max-Planck-Institut für Eisenforschung GmbH") OR AFFIL("Max Planck Institute for Sustainable Materials"))'
             headers = {
                 "X-ELS-APIKey": self.api_key,
                 "Accept": "application/json"
             }
             params = {
                 "query": query,
-                "field": "author-id",
+                # "field": "author-id",
                 "count": 1
             }
-
+            print("BASE_AUTHOR_URL",BASE_AUTHOR_URL)
+            print("headers",headers)
+            print("params",params)
             response = requests.get(BASE_AUTHOR_URL, headers=headers, params=params)
             if response.status_code == 200:
                 data = response.json()
+                print("data",data)
                 entries = data['search-results'].get('entry', [])
                 if entries:
                     self.author_id_map[author_name] = entries[0].get('dc:identifier').split(':')[-1]
