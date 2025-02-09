@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup
+import time
 import pandas as pd
 from collections import OrderedDict
 import requests
@@ -22,6 +22,8 @@ class ScopusManager:
         self.metadata_map = {}
         self.af_id_ = None
         self.author_id_map = {}
+        self.last_request = time.time()
+        self.rate_limit = 10
 
     @property
     def af_id(self):
@@ -60,7 +62,9 @@ class ScopusManager:
                 'X-ELS-APIKey': self.api_key,
             }
             try:
+                time.sleep(max(self.rate_limit - (time.time()-self.last_request), 0))
                 response = requests.get(url + doi, headers=headers)
+                self.last_request = time.time()
                 response.raise_for_status()
                 self.metadata_map[doi] = response.json()
                 logger.debug(f'scopus_metadata {response.json()}')
@@ -93,7 +97,7 @@ class ScopusManager:
                 if is_mp_publication:
                     break
             if not is_mp_publication:
-                overview['Field'] = f'Authors {list(author_affiliation_map.keys())} have no Max-Planck affiliation'
+                overview['Field'] = f'Authors have no Max-Planck affiliation (Scopus)'
             scopus_id = scopus_metadata['abstracts-retrieval-response']['coredata']['prism:url'].split('/')[-1]
             overview['scopus'] = f"https://www.scopus.com/inward/record.uri?partnerID=HzOxMe3b&scp={scopus_id}&origin=inward"
         else:
@@ -108,7 +112,9 @@ class ScopusManager:
             'Accept': 'application/json',
             'X-ELS-APIKey': self.api_key
         }
+        time.sleep(max(self.rate_limit - (time.time()-self.last_request),0))
         response = requests.get(author_api_url, headers=headers)
+        self.last_request = time.time()
 
         if response.status_code == 200:
             author_data = response.json()
@@ -202,7 +208,9 @@ class ScopusManager:
             print("BASE_AUTHOR_URL",BASE_AUTHOR_URL)
             print("headers",headers)
             print("params",params)
+            time.sleep(max(self.rate_limit - (time.time()-self.last_request), 0))
             response = requests.get(BASE_AUTHOR_URL, headers=headers, params=params)
+            self.last_request = time.time()
             if response.status_code == 200:
                 data = response.json()
                 print("data",data)

@@ -8,9 +8,11 @@ from datetime import datetime
 import yaml
 from pathlib import Path
 import requests
-import json
+import logging
 import re
 import math
+
+logger = logging.getLogger(__name__)
 
 class PubmanCreator(PubmanBase):
     def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token=None, user_id=None):
@@ -104,7 +106,7 @@ class PubmanCreator(PubmanBase):
         request_list = []
 
         for index, row in df.iterrows():
-            self.log.info(f"Generating requests for \"{row.get('Talk Title')}\"")
+            logger.info(f"Generating requests for \"{row.get('Talk Title')}\"")
             row_authors_info = self.get_row_authors_info(row)
             metadata_creators = []
             for author, info in row_authors_info.items():
@@ -199,7 +201,7 @@ class PubmanCreator(PubmanBase):
 
         if response.status_code in [200, 201]:
             file_id = response.json()
-            self.log.debug(f"File uploaded successfully. File ID: {file_id}")
+            logger.debug(f"File uploaded successfully. File ID: {file_id}")
             return file_id
         else:
             raise Exception(f"Failed to upload file: {response.status_code} {response.text}")
@@ -279,7 +281,7 @@ class PubmanCreator(PubmanBase):
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
             if self.clean_scalar(row.get('License url')):
                 if not pdf_path.exists():
-                    self.log.error(f'PDF for DOI {doi} not found in {pdf_path}')
+                    logger.error(f'PDF for DOI {doi} not found in {pdf_path}')
                 else:
                     file_id = self.upload_pdf(pdf_path)
                     file =  {
@@ -347,7 +349,7 @@ class PubmanCreator(PubmanBase):
                     "dateCreated": date_published_online,
                     "datePublishedInPrint": date_issued,
                     "datePublishedOnline": date_published_online ,
-                    "genre": 'ARTICLE',
+                    "genre": 'ARTICLE', # TODO: add Book with ISBN etc.
                     "identifiers": [
                         {"id": doi, "type": "DOI"},
                     ],
@@ -373,18 +375,18 @@ class PubmanCreator(PubmanBase):
             existing_publication = self.search_publication_by_criteria(criteria)
             if existing_publication:
                 if overwrite:
-                    self.log.info(f"Overwriting existing publication: '{title}' with criteria '{criteria}':")
+                    logger.info(f"Overwriting existing publication: '{title}' with criteria '{criteria}':")
                     for pub in existing_publication:
                         deleted = self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
                         if not deleted:
-                            self.log.info(f"Publication \"{title}\" cannot be deleted, skipping...")
+                            logger.info(f"Publication \"{title}\" cannot be deleted, skipping...")
                 else:
-                    self.log.info(f"Publication already exists, skipping creation: '{criteria}'")
+                    logger.info(f"Publication already exists, skipping creation: '{criteria}'")
                     created_item = existing_publication[0]['data']
                     item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
                     continue
             if create_items:
-                self.log.info(f"Creating new publication: '{criteria}'")
+                logger.info(f"Creating new publication: '{criteria}'")
                 created_item = self.create_item(request_json)
             if created_item:
                 item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))
@@ -392,7 +394,7 @@ class PubmanCreator(PubmanBase):
         if submit_items:
             for item_id, modification_date, version_state in item_ids:
                 if version_state not in ['PENDING', 'IN_REVISION']:
-                    self.log.info(f"Entry already has the state '{version_state}', skipping...")
+                    logger.info(f"Entry already has the state '{version_state}', skipping...")
                 else:
                     submitted_item = self.submit_item(item_id, modification_date)
-                    self.log.info(f"Submitted item: {submitted_item}")
+                    logger.info(f"Submitted item: {submitted_item}")

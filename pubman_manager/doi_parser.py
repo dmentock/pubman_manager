@@ -1,4 +1,4 @@
-from habanero import Crossref
+import time
 from unidecode import unidecode
 from bs4 import BeautifulSoup
 from pathlib import Path
@@ -15,9 +15,10 @@ import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
-from urllib.parse import urlencode
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
+
+logger = logging.getLogger(__name__)
 
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None):
@@ -54,7 +55,6 @@ class DOIParser:
 
     def compare_author_name_to_pure_db(self, pubman_names, first_name, surname) -> Tuple[str]:
         """Match Scopus author names with PuRe author names, preserving formatting from the database."""
-
         def normalize_name_for_comparison(name):
             # Remove accents and convert to ASCII
             name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8')
@@ -87,7 +87,11 @@ class DOIParser:
 
         # No match found; return the input name without middle names or initials
         # Extract the first name without middle names or initials
-        first_name_no_middle = first_name.split()[0]
+        if first_name:
+            first_name_no_middle = first_name.split()[0]
+        else:
+            print("NOFIRSTNAME", first_name, surname)
+            first_name_no_middle = ''
         return first_name_no_middle, surname
 
     def compare_author_list_to_pure_db(self, affiliations_by_name: Dict[str, List[str]]) -> Dict[str, List[Dict[str, Any]]]:
@@ -96,7 +100,7 @@ class DOIParser:
         and possibly adopt PuRe if differences are small.
         """
 
-        self.log.debug(f'Entering compare_author_list_to_pure_db')
+        logger.debug(f'Entering compare_author_list_to_pure_db')
         def process_affiliation(affiliation: str) -> str:
             """Format affiliation string."""
             return affiliation.replace('  ', ', ').replace(') ', '), ')
@@ -147,16 +151,16 @@ class DOIParser:
             for proposed_affiliation in affiliations if affiliations else []:
                 pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
                 if pubman_author_affiliations:
-                    self.log.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check: {is_mpi_affiliation(proposed_affiliation)}")
+                    logger.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check: {is_mpi_affiliation(proposed_affiliation)}")
 
                     if is_mpi_affiliation(proposed_affiliation):
-                        self.log.debug(f"Handling MPI affiliation")
+                        logger.debug(f"Handling MPI affiliation")
                         affiliation_info = handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations)
                     else:
-                        self.log.debug(f"Handling non-MPI affiliation")
+                        logger.debug(f"Handling non-MPI affiliation")
                         affiliation_info = handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations)
                 elif proposed_affiliation.strip():
-                    self.log.debug(f"No PuRe affiliation for {author}, but provided: {proposed_affiliation}")
+                    logger.debug(f"No PuRe affiliation for {author}, but provided: {proposed_affiliation}")
                     if is_mpi_affiliation(proposed_affiliation):
                         affiliation_info = {
                             'affiliation': 'MISSING MPI',
@@ -176,17 +180,17 @@ class DOIParser:
                 if is_mpi_affiliation(affiliation_info['affiliation']):
                     mpi_groups[affiliation_info['affiliation']] += 1
 
-        self.log.debug(f"MPI groups: {mpi_groups}")
+        logger.debug(f"MPI groups: {mpi_groups}")
         most_common_mpi_group = mpi_groups.most_common(1)[0][0] if mpi_groups else self.mpi_affiliations[0]
-        self.log.debug(f"Most common MPI group: {most_common_mpi_group}")
+        logger.debug(f"Most common MPI group: {most_common_mpi_group}")
 
         # Resolve ambiguous MPI affiliations and assign missing MPI groups
         for author, affiliations in processed_affiliations.items():
-            self.log.debug(f'Postprocessing author {author}')
+            logger.debug(f'Postprocessing author {author}')
             if not affiliations:
                 pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
                 if pubman_author_affiliations:
-                    self.log.debug(f'No external affiliations found, using PuRe instead: {pubman_author_affiliations}')
+                    logger.debug(f'No external affiliations found, using PuRe instead: {pubman_author_affiliations}')
                     processed_affiliations[author].append({
                         'affiliation': list(pubman_author_affiliations)[0],
                         'color': 'red',
@@ -194,7 +198,7 @@ class DOIParser:
                         'comment': 'No external affiliations found, using PuRe instead'
                     })
                 else:
-                    self.log.debug(f'No external affiliations or PuRe affiliations found, leaving empty')
+                    logger.debug(f'No external affiliations or PuRe affiliations found, leaving empty')
                     processed_affiliations[author].append({
                         'affiliation': '',
                         'color': 'red',
@@ -204,9 +208,9 @@ class DOIParser:
             else:
                 for i, affiliation_info in enumerate(affiliations):
                     affiliation = affiliation_info['affiliation']
-                    self.log.debug(f"Author: {author}, Current affiliation: {affiliation}")
+                    logger.debug(f"Author: {author}, Current affiliation: {affiliation}")
                     if affiliation == 'AMBIGUOUS MPI':
-                        self.log.debug(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
+                        logger.debug(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
                         similar_affiliation, score = process.extractOne(most_common_mpi_group, ambiguous_mpi_affiliations[author])
                         compare_error = (100 - score) / 100
                         processed_affiliations[author][i] = {
@@ -240,13 +244,13 @@ class DOIParser:
         """
         pdf_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
         if pdf_path.exists():
-            self.log.debug(f'Pdf path {pdf_path} already exists, skipping...')
+            logger.debug(f'Pdf path {pdf_path} already exists, skipping...')
             return True
         else:
-            self.log.debug(f"Attempting to download PDF for DOI: {doi}")
-            self.log.debug(f"PDF link: {pdf_link}")
+            logger.debug(f"Attempting to download PDF for DOI: {doi}")
+            logger.debug(f"PDF link: {pdf_link}")
             if pdf_link is None:
-                self.log.error(f"No valid PDF link found for DOI: {doi}")
+                logger.error(f"No valid PDF link found for DOI: {doi}")
                 return False
             attempt = 0
             while attempt < retries:
@@ -256,18 +260,26 @@ class DOIParser:
                         with open(pdf_path, 'wb') as f:
                             for chunk in response.iter_content(1024):
                                 f.write(chunk)
-                        self.log.info(f"Successfully downloaded PDF for DOI: {doi}")
+                        logger.info(f"Successfully downloaded PDF for DOI: {doi}")
                         return True
                     else:
                         cleaned_html = BeautifulSoup(response.text, "html.parser").text
-                        self.log.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
+                        logger.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
                         break  # Stop retrying if the server returns a valid response but not a 200.
                 except requests.exceptions.RequestException as e:
-                    self.log.warning(f"Error downloading PDF on attempt {attempt + 1}: {e}")
+                    logger.warning(f"Error downloading PDF on attempt {attempt + 1}: {e}")
                     attempt += 1
 
-            self.log.error(f"Failed to download PDF after {retries} attempts for DOI: {doi}")
+            logger.error(f"Failed to download PDF after {retries} attempts for DOI: {doi}")
             return False
+
+    def has_pubman_entry(self, doi):
+        pub =self.pubman_api.search_publication_by_criteria({
+                    "metadata.identifiers.id": doi,
+                    "metadata.identifiers.type": 'DOI'
+                })
+        print("pub HASDOI",doi,pub)
+        return bool(pub)
 
     def get_dois_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> pd.DataFrame:
         """
@@ -294,21 +306,16 @@ class DOIParser:
                 results.setdefault(doi, {'crossref': False, 'scopus': False}).update(crossref_result)
 
         dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start=pubyear_start, pubyear_end=pubyear_end)
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            futures = {executor.submit(self.scopus_manager.get_overview, doi): doi for doi in dois_scopus}
-            for future in as_completed(futures):
-                doi, scopus_result = future.result()
-                if existing_entry:=results.get(doi):
-                    existing_field = existing_entry.get('Field', '')
-                    scopus_result['Field'] = existing_field + '\n' + scopus_result.get('Field', '')
-                results.setdefault(doi, {'crossref': False, 'scopus': False}).update(scopus_result)
+        for doi in dois_scopus:
+            doi, scopus_result = self.scopus_manager.get_overview(doi)
+            if existing_entry:=results.get(doi):
+                existing_field = existing_entry.get('Field', '')
+                scopus_result['Field'] = existing_field + '\n' + scopus_result.get('Field', '')
+            results.setdefault(doi, {'crossref': False, 'scopus': False}).update(scopus_result)
 
         for doi in results.keys():
-            pub = self.pubman_api.search_publication_by_criteria({
-                "metadata.identifiers.id": doi,
-                "metadata.identifiers.type": 'DOI'
-            })
-            if pub:
+            if self.has_pubman_entry(doi):
+                logger.info(f'Foud Publication for {doi} in PuRe.')
                 results[doi]['Field'] = (results[doi].setdefault('Field', '') + "\nAlready exists in PuRe").strip()
             if results[doi].get('Publication Date'):
                 date = self.parse_date(results[doi]['Publication Date'])
@@ -336,13 +343,15 @@ class DOIParser:
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
         print("df_dois_overview",df_dois_overview)
-        new_dois_df = df_dois_overview if not force else \
-            df_dois_overview[(df_dois_overview['Field'].isnull()) | (df_dois_overview['Field'] == '')]
 
         dois_data = []
-        for index, row in new_dois_df.iterrows():
+        for index, row in df_dois_overview.iterrows():
+            print("row['Field']",row['Field'])
+            if str(row['Field']).strip():
+                logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
+                continue
             doi = row['DOI']
-            self.log.debug(f"Processing Publication DOI {doi}")
+            logger.debug(f"Processing Publication DOI {doi}")
             print(row['Title'], row['crossref'], row['scopus'])
 
             def clean_html(raw_html):
@@ -350,7 +359,7 @@ class DOIParser:
                 return soup.get_text()
 
             if not row['crossref']:
-                self.log.warning(f'Publication {row["DOI"]} has no crossref entry, ignoring for now...')
+                logger.warning(f'Publication {row["DOI"]} has no crossref entry, ignoring for now...')
                 continue
 
             crossref_metadata = self.crossref_manager.get_metadata(doi)
@@ -367,7 +376,7 @@ class DOIParser:
             pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
             if row['scopus']:
                 scopus_metadata = self.scopus_manager.get_metadata(doi)
-                affiliations_by_name = self.extract_scopus_authors_affiliations(scopus_metadata)
+                affiliations_by_name = self.scopus_manager.extract_authors_affiliations(scopus_metadata)
                 if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])!=1:
                     license_type = 'closed'
                 date_issued_scopus = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['source']['publicationdate']
@@ -375,15 +384,12 @@ class DOIParser:
                               (f"{date_issued_scopus.get('month', '').zfill(2)}." if date_issued_scopus.get('month') else "") + \
                               (date_issued_scopus.get('year', '') ).rstrip('.')
             else:
-                self.log.info(f'Scopus not available for {doi}, using crossref affiliations...')
+                logger.info(f'Scopus not available for {doi}, using crossref affiliations...')
                 affiliations_by_name = self.crossref_manager.extract_authors_affiliations(crossref_metadata)
-                print(f"zzzzzzzzzz")
-                print(f"affiliations_by_name {affiliations_by_name}")
                 date_issued_crossref = crossref_metadata['issued']['date-parts']
                 date_issued = (f"{date_issued_crossref[0][2]}." if len(date_issued_crossref[0])==3 else "") + \
                               (f"{date_issued_crossref[0][1]}." if len(date_issued_crossref[0])>=2 else "") + \
                               (f"{date_issued_crossref[0][0]}")
-                print("date_issuedct",date_issued)
 
             missing_pdf = True if license_type!='closed' and not pdf_found else False
 
@@ -426,7 +432,7 @@ class DOIParser:
             empty_path = Path(os.path.abspath(path_out)).parent / f'{path_out.stem}_empty{path_out.suffix}'
             df = pd.DataFrame()
             df.to_excel(empty_path, index=False)
-            self.log.info(f"Saved empty_path {empty_path} successfully.")
+            logger.info(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
             column_details = OrderedDict({
@@ -437,4 +443,4 @@ class DOIParser:
             create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
                         column_details, n_authors,
                         prefill_publications = dois_data)
-            self.log.info(f"Saved {path_out} successfully.")
+            logger.info(f"Saved {path_out} successfully.")

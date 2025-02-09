@@ -9,10 +9,12 @@ from pathlib import Path
 
 from pubman_manager import ENV_USERNAME, ENV_PASSWORD
 
+logger = logging.getLogger(__name__)
+
 class PubmanBase:
     def __init__(self, base_url = "https://pure.mpg.de/rest", auth_token = None, user_id=None):
         logging.basicConfig(level=logging.INFO)
-        self.log = logging.getLogger()
+        logger = logging.getLogger()
         self.base_url = base_url
 
         # self.org_id = 'ou_1863381' # PuRe Org ID for all MPIE publications, TODO: fetch based on Institute name
@@ -22,7 +24,7 @@ class PubmanBase:
             self.auth_token = auth_token
             self.user_id = user_id
         else:
-            self.log.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
+            logger.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
             self.auth_token, self.user_id, = self.login(ENV_USERNAME, ENV_PASSWORD)
 
         self.headers = {"Authorization": self.auth_token}
@@ -167,7 +169,7 @@ class PubmanBase:
             data=json.dumps({"lastModificationDate": last_modification_date})
         )
         # if response.status_code != 200:
-        #     self.log.info(f'deleting item {item_id} failed: {response.text}')
+        #     logger.info(f'deleting item {item_id} failed: {response.text}')
 
     def submit_item(self, item_id, last_modification_date, comment):
         headers = self.headers_json
