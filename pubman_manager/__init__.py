@@ -13,6 +13,8 @@ PUBLICATIONS_DOIS_DIR.mkdir(exist_ok=True)
 PUBLICATIONS_DIR = PROJECT_ROOT / 'publications'
 PUBLICATIONS_DIR.mkdir(exist_ok=True)
 
+print("PROJECT_ROOT",PROJECT_ROOT)
+print("PUBLICATIONS_DIR",PUBLICATIONS_DIR)
 TALKS_DIR = PROJECT_ROOT / 'talks'
 TALKS_DIR.mkdir(exist_ok=True)
 

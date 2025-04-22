@@ -101,6 +101,15 @@ class CrossrefManager:
             items = data.get('message', {}).get('items', [])
             for item in items:
                 doi = item['DOI']
+                if item.get('subtype') == 'preprint':
+                    logger.info(f"Skipping preprint {doi} {item.get('published', {})}")
+                    continue
+                if 'proceeding' in item.get('type', ''):
+                    logger.info(f"Skipping proceeding article {doi} {item.get('type', '')}")
+                    continue
+                if 'ssrn' in doi.lower() or 'egusphere' in doi.lower():
+                    logger.info(f"Skipping ssrn or egusphere {doi}")
+                    continue
                 for author_data in item.get('author', []):
                     if author_name == f"{author_data.get('given', '').strip()} {author_data.get('family', '').strip()}".strip():
                         dois.append(doi)

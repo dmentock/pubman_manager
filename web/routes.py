@@ -59,7 +59,7 @@ def login():
 
             print("keke")
             pubman_creator = PubmanCreator(auth_token=auth_token, user_id=user_id)
-            doi_parser = DOIParser(pubman_creator, logging_level=logging.DEBUG)
+            doi_parser = DOIParser(pubman_creator)
             user = User(username)
             login_user(user)
             return redirect(url_for('dashboard'))

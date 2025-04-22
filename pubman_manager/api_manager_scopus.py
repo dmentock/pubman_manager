@@ -135,7 +135,16 @@ class ScopusManager:
         Generates an ordered mapping from authors to their affiliations with the Scopus API
         """
         author_affiliation_map = OrderedDict()
-        authors_list = scopus_metadata['abstracts-retrieval-response']['authors']['author']
+        abstracts_retrieval = scopus_metadata.get('abstracts-retrieval-response', {})
+        print("abstracts_retrieval",abstracts_retrieval)
+        if not abstracts_retrieval:
+            logger.warning('No info found in Scopus')
+            return {}
+        authors_list = abstracts_retrieval.get('authors', {})
+        if not authors_list:
+            logger.warning('No authors found in Scopus')
+            return {}
+
         author_groups = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['author-group']
         if isinstance(author_groups, dict):
             author_groups = [author_groups]
@@ -172,7 +181,7 @@ class ScopusManager:
                 if author_id not in author_id_to_affiliations:
                     author_id_to_affiliations[author_id] = []
                 author_id_to_affiliations[author_id].extend(affiliation_list)
-        for author in authors_list:
+        for author in authors_list.get('author', []):
             preferred_name = author.get('preferred-name', {})
             first_name = preferred_name.get('ce:given-name', '')
             surname = preferred_name.get('ce:surname', '')

@@ -2,18 +2,20 @@ import xlsxwriter
 from collections import OrderedDict, Counter
 
 class Cell:
-    def __init__(self, data, width=None, color='', comment='', compare_error=None):
+    def __init__(self, data, width=None, color='', comment='', compare_error=None, force_text=False):
         self.data = data
         self.width = width
         self.color = color
         self.comment = comment
         self.compare_error = compare_error
+        self.force_text = force_text
 
     def __str__(self):
-        return f"Cell(data={self.data}, color={self.color}, comment={self.comment}, compare_error={self.compare_error})"
+        return f"Cell(data={self.data}, color={self.color}, comment={self.comment}, compare_error={self.compare_error}, force_text={self.force_text})"
 
     def __repr__(self):
         return str(self)
+
 
 
 def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
@@ -68,6 +70,7 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
     header_format = workbook.add_format({'text_wrap': True, 'bold': True, 'align': 'center', 'valign': 'vcenter', 'locked': True})
     italic_format = workbook.add_format({'italic': True, 'text_wrap': True, 'locked': True})
     wrap_format = workbook.add_format({'text_wrap': True, 'locked': True})
+    text_format = workbook.add_format({'num_format': '@'})  # '@' forces text format in Excel
 
     disclaimer_format = workbook.add_format({
         'bold': True,
@@ -179,14 +182,21 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
         for entry_idx, publication in enumerate(prefill_publications):
             for col_index, header in enumerate(col_layout.keys()):
                 if header in publication:
-                    if publication[header]:
-                        if not (cell_value := publication[header].data):
-                            cell_value = ''
-                        main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_color_formats.get(publication[header].color, wrap_format))
+                    cell_obj = publication[header]
+                    if cell_obj:
+                        # Ensure cell_value is retrieved properly
+                        cell_value = cell_obj.data if cell_obj.data is not None else ''
+
+                        # Check if we need to force text format
+                        cell_format = cell_color_formats.get(cell_obj.color, wrap_format)
+                        if isinstance(cell_obj, Cell) and cell_obj.force_text:
+                            main_sheet.write_string(start_row + 1 + entry_idx, col_index, str(cell_value), text_format)
+                        else:
+                            main_sheet.write(start_row + 1 + entry_idx, col_index, cell_value, cell_format)
     else:
         for entry_idx in range(n_entries):
             for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
-                if not 'Helper' in header and header not in ['Entry Number']:
+                if 'Helper' not in header and header not in ['Entry Number']:
                     main_sheet.write(start_row + entry_idx, col_index, '', wrap_format)
                 if comment:
                     main_sheet.data_validation(
@@ -197,6 +207,7 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
                             'error_type': 'warning'
                         }
                     )
+
     for i in range(n_authors):
         helper_col = list(col_layout.keys()).index(f'Helper {i + 1}')
         main_sheet.set_column(helper_col, helper_col, None, None, {'hidden': True})

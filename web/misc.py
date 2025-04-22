@@ -131,11 +131,11 @@ def run_periodic_task():
 
     for user_id, user_info in users.items():
         pubman_api = PubmanBase()
-        parser = DOIParser(pubman_api, logging_level = logging.DEBUG)
+        parser = DOIParser(pubman_api)
         new_publication_dois = get_user_dois(user_id, parser)
         if new_publication_dois:
             logging.info(f'Processing new DOIS for user {user_id} ({user_info}):')
             logging.info(f'{new_publication_dois}')
             send_author_publications(new_publication_dois, user_info['email'], parser)
         else:
-            logging.info(f'No new DOIS for user {user_info['email']} (tracking {user_info['tracked_authors']})')
+            logging.info(f"No new DOIS for user {user_info['email']} (tracking {user_info['tracked_authors']})")
