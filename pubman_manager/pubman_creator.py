@@ -311,8 +311,10 @@ class PubmanCreator(PubmanBase):
 
 
             journalname_in_pubman = self.get_best_journal_match(row.get('Journal Title', ''))
-            print("JOUR", row.get('Journal Title', ''))
-            print("jos", journalname_in_pubman)
+            # print("JOUR", row.get('Journal Title', ''))
+            # print("jos", journalname_in_pubman)
+            # print("row.get('Title')",row.get('Title'))
+            # continue
             identifiers = self.journals.get(journalname_in_pubman, {}).get('identifiers', {})
             identifiers['ISSN'] = self.clean_scalar(row.get('ISSN'))
             identifiers_list = [{'type': key, 'id': id} for key, id in
@@ -444,6 +446,7 @@ class PubmanCreator(PubmanBase):
                     continue
             if create_items:
                 logger.info(f"Creating new publication: '{criteria}'")
+                print("request_json",request_json)
                 created_item = self.create_item(request_json)
             if created_item:
                 item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))

@@ -11,3 +11,4 @@ files
 *geckodriver.exe
 legacy_scripts
 .codegpt
+web/users

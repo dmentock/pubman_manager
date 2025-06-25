@@ -80,7 +80,8 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
     })
 
     colors = {
-        'gray': '#d3d3d3',
+        'darkred': '#d3d3d3',
+        'gray': '#8B0000',
         'yellow': '#ffffe0',
         'orange': '#ffd8b1',
         'red': '#ff9999',

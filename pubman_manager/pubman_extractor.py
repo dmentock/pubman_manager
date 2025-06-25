@@ -11,16 +11,16 @@ class PubmanExtractor(PubmanBase):
         publications = []
         org_publications = self.search_publications_by_organization(org_id, size=200000)
         publications.extend(org_publications)
-        with open(PUBMAN_CACHE_DIR / org_id / "publications.yaml", "w") as f:
+        with open(PUBMAN_CACHE_DIR / "publications.yaml", "w") as f:
             yaml.dump(publications, f)
         authors_info = self.extract_authors_info(publications)
         authors_info[('Dierk', 'Raabe')]['affiliations'] = ['Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society']
-        with open(PUBMAN_CACHE_DIR / org_id / "authors_info.yaml", "w") as f:
+        with open(PUBMAN_CACHE_DIR / "authors_info.yaml", "w") as f:
             yaml.dump(authors_info, f)
-        with open(PUBMAN_CACHE_DIR / org_id / 'identifier_paths.yaml', 'w', encoding='utf-8') as f:
+        with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'w', encoding='utf-8') as f:
             yaml.dump(self.extract_organization_mapping(publications), f)
         journals = self.extract_journal_names(publications)
-        with open(PUBMAN_CACHE_DIR / org_id / "journals.yaml", "w") as f:
+        with open(PUBMAN_CACHE_DIR / "journals.yaml", "w") as f:
             yaml.dump(journals, f)
 
     def extract_organization_mapping(self, data):
@@ -56,6 +56,19 @@ class PubmanExtractor(PubmanBase):
         return reduced_affiliations
 
     def extract_authors_info(self, publications):
+        def smart_deduplicate(strings, threshold=95):
+            unique = []
+
+            for s in strings:
+                is_duplicate = False
+                for u in unique:
+                    similarity = fuzz.ratio(s, u)
+                    if similarity >= threshold:
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    unique.append(s)
+            return unique
         authors_info = {}
         for record in publications:
             metadata = record.get('data', {}).get('metadata', {})
@@ -86,6 +99,12 @@ class PubmanExtractor(PubmanBase):
                             to_remove.append(author)
                 elif (author[0].split()[0], author[1]) in authors_info:
                     to_remove.append(author)
+            authors_info[author]['affiliations'] = smart_deduplicate(authors_info[author].get('affiliations', []))
+            susmat_entries = []
+            for affiliation in authors_info[author]['affiliations']:
+                if 'Max-Planck-Institut für Eisenforschung GmbH' in affiliation:
+                    susmat_entries.append(affiliation.replace('Max-Planck-Institut für Eisenforschung GmbH', 'Max Planck Institute for Sustainable Materials'))
+            authors_info[author]['affiliations'].extend(susmat_entries)
         for author in set(to_remove):
             del authors_info[author]
 

@@ -23,7 +23,7 @@ class ScopusManager:
         self.af_id_ = None
         self.author_id_map = {}
         self.last_request = time.time()
-        self.rate_limit = 10
+        self.rate_limit = 2
 
     @property
     def af_id(self):
@@ -103,8 +103,6 @@ class ScopusManager:
         else:
             overview['Field'] = 'Publication not found on Scopus'
         return doi, overview
-
-
 
     def get_author_full_name(self, author_id):
         author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"

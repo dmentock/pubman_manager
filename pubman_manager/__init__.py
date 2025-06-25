@@ -4,6 +4,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 PUBMAN_CACHE_DIR = PROJECT_ROOT / 'pubman_cache'
 PUBMAN_CACHE_DIR.mkdir(exist_ok=True)
 
+AUTHORS_INFO_FILE = PUBMAN_CACHE_DIR / 'authors_info.yaml'
+
 FILES_DIR = PROJECT_ROOT / 'files'
 FILES_DIR.mkdir(exist_ok=True)
 
@@ -17,6 +19,8 @@ print("PROJECT_ROOT",PROJECT_ROOT)
 print("PUBLICATIONS_DIR",PUBLICATIONS_DIR)
 TALKS_DIR = PROJECT_ROOT / 'talks'
 TALKS_DIR.mkdir(exist_ok=True)
+
+USER_DATA_DIR = PROJECT_ROOT / 'web' / 'users'
 
 from dotenv import load_dotenv
 import os

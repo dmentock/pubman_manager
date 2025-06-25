@@ -15,7 +15,6 @@ import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
-from rapidfuzz import fuzz
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
 
@@ -34,7 +33,7 @@ class DOIParser:
         self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key)
 
         self.pubman_api = pubman_api
-        with open(PUBMAN_CACHE_DIR / pubman_api.org_id / 'authors_info.yaml', 'r', encoding='utf-8') as f:
+        with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
             self.affiliations_by_name_pubman = yaml.load(f, Loader=yaml.FullLoader)
         mpi_affiliation_counter = Counter()
         for author, author_info in self.affiliations_by_name_pubman.items():
@@ -181,12 +180,11 @@ class DOIParser:
                             'comment': 'No PuRe affiliation for author, adopting external affiliation.'
                         }
                 else:
-                    logger.error(f'Affiliation for {author} not found in PuRe or Scopus/Crossref')
                     affiliation_info = {
-                        'affiliation': '',
-                        'color': 'red',
-                        'compare_error': 100,
-                        'comment': 'No PuRe or Scopus/Crossref affiliation for author'
+                        'affiliation': process_affiliation(proposed_affiliation),
+                        'color': 'darkred',
+                        'compare_error': 0,
+                        'comment': f'Affiliation for {author} not found in PuRe or Scopus/Crossref'
                     }
                 processed_affiliations[author].append(affiliation_info)
 
@@ -286,60 +284,34 @@ class DOIParser:
             logger.error(f"Failed to download PDF after {retries} attempts for DOI: {doi}")
             return False
 
-    def has_pubman_entry(self, doi=None, title=None):
-        pub = False
-        if doi:
-            pub = self.pubman_api.search_publication_by_criteria({
-                        "metadata.identifiers.id": doi,
-                        "metadata.identifiers.type": 'DOI'
-                    })
-        if (not doi or not pub) and title:
+    def has_pubman_entry(self, doi, title=None):
+        pub = self.pubman_api.search_publication_by_criteria({
+                    "metadata.identifiers.id": doi,
+                    "metadata.identifiers.type": 'DOI'
+                })
+        if not pub and title:
             logger.info(f'Unable to find DOI match in PuRe database, trying to find title instead: "{title}"')
             title_words = title.split(' ')
-            cutoff = int(len(title_words) * 0.7)
-            print("title_words[:cutoff]",title_words[:cutoff])
-            print("title_words[cutoff:]",title_words[cutoff:])
-            pub_first_half = self.pubman_api.search_publication_by_criteria({
-                "metadata.title": ' '.join(title_words[:cutoff])
-            })
-            pub_latter_half = self.pubman_api.search_publication_by_criteria({
-                "metadata.title": ' '.join(title_words[cutoff:])
-            })
-            found_pub = False
-            for pubman_entry in (pub_first_half if pub_first_half else []) + (pub_latter_half if pub_latter_half else []):
-                existing_title = pubman_entry['data']['metadata']['title']
-                similarity = fuzz.partial_ratio(existing_title, title)
-                if similarity >= 95 or \
-                    re.sub(r'[^a-zA-Z]', '', title).lower() in re.sub(r'[^a-zA-Z]', '', existing_title).lower() or \
-                    re.sub(r'[^a-zA-Z]', '', existing_title).lower() in re.sub(r'[^a-zA-Z]', '', title).lower():
-                    logger.info(
-                        f'''Found Titl in DB, ignoring new entry: "{existing_title}"'''
-                    )
-                    found_pub = True
-                    break
-            if not found_pub:
-                logger.info("No close match found in database. Proceeding with new entry...")
+            # print("title_words", [title_words])
+            pub_first_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[:int(len(title_words)//1.5)])})
+            pub_latter_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[int(len(title_words)//1.5):])})
+            if pub_first_half or pub_latter_half:
+                logger.info(f'Found Title match in Database, ignoring new entry')
         return bool(pub)
 
-    def filter_existing_dois(self, dois):
-        res = []
-        for doi in dois:
-            if self.has_pubman_entry(doi):
-                logger.info(f'DOI {doi} already exists in PuRe, skipping...')
-            else:
-                res.append(doi)
-        return res
-
     def get_doi_data_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> pd.DataFrame:
-
+        import traceback
         results = {}
-
-        dois_crossref = self.crossref_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
-        self._process_crossref_dois(self.filter_existing_dois(dois_crossref), results)
-
-        dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
-        self._process_scopus_dois(self.filter_existing_dois(dois_scopus), results)
-
+        try:
+            dois_crossref = self.crossref_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
+            self._process_crossref_dois(dois_crossref, results)
+        except Exception as e:
+            logger.error(f'Failed to retrieve crossref info from author: {e}\n\n{traceback.format_exc()}')
+        try:
+            dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
+            self._process_scopus_dois(dois_scopus, results)
+        except Exception as e:
+            logger.error(f'Failed to retrieve scopus info from author: {e}\n\n{traceback.format_exc()}')
         return self._generate_results_df(results)
 
     def get_data_for_dois(self, dois: List[str]) -> pd.DataFrame:
@@ -383,12 +355,7 @@ class DOIParser:
             if self.has_pubman_entry(doi, title = info.get('Title')):
                 logger.info(f'Found Publication for {doi} in PuRe.')
                 current_field = info.get('Field', '')
-                results[doi]['Field'] = f"{current_field}\nTitle already exists in PuRe".strip()
-            # Check publication completeness
-            # if not info.get('Issue') and not info.get('Volume'):
-            #     logger.info(f'Publication {doi} has not yet a specified Issue or Volume')
-            #     current_field = info.get('Field', '')
-            #     results[doi]['Field'] = f"{current_field}\nNo specified Issue or Volume".strip()
+                results[doi]['Field'] = f"{current_field}\nAlready exists in PuRe".strip()
             # Process publication dates
             pub_date = info.get('Publication Date')
             if pub_date:
@@ -403,7 +370,7 @@ class DOIParser:
         df = df.sort_values('Publication Date')
         return df
 
-    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
+    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, processed_dois: List[str], force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
         Takes overview dataframe, collects all data for DOIs which are not yet on PuRe and have Scopus and Crossref entries.
         Generates dataframe which can be passed to the excel_generator.create_sheet method to prefill the sheet with data.
@@ -416,13 +383,17 @@ class DOIParser:
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
         """
         print("df_dois_overview",df_dois_overview)
-
         dois_data = []
         for index, row in df_dois_overview.iterrows():
-            if str(row['Field']).strip() and not pd.isna(row['Field']) and not force:
+            if str(row['Field']).strip() and not force:
                 logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
                 continue
+
             doi = row['DOI']
+            if doi in processed_dois:
+                logger.info(f'Skipping {row["DOI"]}, already previously processed...')
+                continue
+
             logger.debug(f"Processing Publication DOI {doi}")
             print(row['Title'], row['crossref'], row['scopus'])
 
@@ -435,9 +406,30 @@ class DOIParser:
                 continue
 
             crossref_metadata = self.crossref_manager.get_metadata(doi)
-            title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
             container_title = crossref_metadata.get('container-title', [None])
             journal_title = html.unescape(unidecode(container_title[0])) if container_title else None
+            unused_journals = ['Meeting Abstract', 'iopscience']
+            skip = False
+            for name in unused_journals:
+                if journal_title and name in journal_title:
+                    logger.warning(f'Skipping unused journal {name}: {journal_title}')
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            link = crossref_metadata.get('resource', {}).get('primary', {}).get('URL', '')
+            unused_sites = ['researchhub', 'iopscience']
+            skip = False
+            for site in unused_sites:
+                if site in link:
+                    logger.warning(f'Skipping link from {site}: {link}')
+                    skip = True
+                    break
+            if skip:
+                continue
+
+            title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
             license_list = crossref_metadata.get('license')
             license_url = license_list[-1].get('URL', '') if license_list else None
             license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None
@@ -446,14 +438,14 @@ class DOIParser:
 
             license_type = 'open'
             pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
-            print("ZZZZZZZZZZ",self.scopus_manager.get_metadata(doi))
-            print("row['scopus'] ",row['scopus'] )
-            if row['scopus'] and self.scopus_manager.get_metadata(doi) and self.scopus_manager.get_metadata(doi).get('abstracts-retrieval-response'):
+
+            if row['scopus'] and self.scopus_manager.get_metadata(doi).get('abstracts-retrieval-response'):
                 scopus_metadata = self.scopus_manager.get_metadata(doi)
                 affiliations_by_name = self.scopus_manager.extract_authors_affiliations(scopus_metadata)
                 if not affiliations_by_name:
                     affiliations_by_name = self.crossref_manager.extract_authors_affiliations(crossref_metadata)
-                if int(scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess'])!=1:
+                open_access = scopus_metadata['abstracts-retrieval-response']['coredata']['openaccess']
+                if open_access is not None and int(open_access)!=1:
                     license_type = 'closed'
                 date_issued_scopus = scopus_metadata['abstracts-retrieval-response']['item']['bibrecord']['head']['source']['publicationdate']
                 date_issued = (f"{date_issued_scopus.get('day', '').zfill(2)}." if date_issued_scopus.get('day') else "") + \
@@ -467,9 +459,20 @@ class DOIParser:
                               (f"{date_issued_crossref[0][1]}." if len(date_issued_crossref[0])>=2 else "") + \
                               (f"{date_issued_crossref[0][0]}")
 
-            missing_pdf = True if license_type!='closed' and not pdf_found else False
 
             cleaned_author_list = self.compare_author_list_to_pure_db(affiliations_by_name)
+            has_institute_publication = False
+            for (first_name, last_name), affiliations_info in cleaned_author_list.items():
+                for affiliation_info in affiliations_info:
+                    if any([name in affiliation_info['affiliation'].lower() for name in ['max-planck','max planck','maxplanck']]):
+                        has_institute_publication = True
+            if not has_institute_publication:
+                logger.error('Publication has no author from Max Planck Institute, skipping...')
+                processed_dois.append(doi)
+                continue
+
+            missing_pdf = True if license_type!='closed' and not pdf_found else False
+
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
                 "Journal Title": Cell(journal_title, 25),
@@ -484,16 +487,14 @@ class DOIParser:
                 'DOI': Cell(doi, 20, force_text=True),
                 'License url': Cell(license_url if license_type=='open' else '', 20),
                 'License year': Cell(license_year if license_type=='open' else '', 15),
-                'Pdf found': Cell('closed license' if license_type=='closed' else 'y' if pdf_found else 'n', 15,
+                'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15,
                                   color='red' if missing_pdf else '',
                                   comment = 'Please upload the file and license info when submitting in PuRe'
                                   if missing_pdf else ''),
-                'Link': Cell(crossref_metadata.get('resource', {}).get('primary', {}).get('URL', ''), 20),
+                'Link': Cell(link, 20),
                 'Using Scopus': Cell(str(row['scopus']), 15)
             })
             i = 1
-
-            #TODO: !!!!!! Merge similar affiliations into one !!!!!!!!
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
                 for affiliation_info in affiliations_info:
                     prefill_publication[f"Author {i}"] = Cell(first_name + ' ' + last_name)
@@ -503,6 +504,7 @@ class DOIParser:
                                                                    comment = affiliation_info['comment'])
                     i = i+1
             dois_data.append(prefill_publication)
+            processed_dois.append(doi)
         return dois_data
 
     def write_dois_data(self, path_out, dois_data):
