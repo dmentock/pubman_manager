@@ -17,7 +17,7 @@ extractor = PubmanExtractor()
 
 def update_cache(org_id):
     extractor.extract_org_data(org_id)
-    with open(PUBMAN_CACHE_DIR / org_id / 'authors_info.yaml', 'r', encoding='utf-8') as f:
+    with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
         authors_info = yaml.load(f, Loader=yaml.FullLoader)
     names_affiliations = OrderedDict({key: val['affiliations'] for key, val in authors_info.items() if val})
     file_path = TALKS_DIR / f"Template_Talks_{org_id}.xlsx"
