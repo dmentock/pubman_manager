@@ -1,5 +1,6 @@
 from pathlib import Path
 from ruamel.yaml import YAML
+import re
 
 import logging
 
@@ -8,9 +9,7 @@ logger = logging.getLogger(__name__)
 yaml_obj = YAML(typ="unsafe")
 
 def is_mpi_affiliation(affiliation: str) -> bool:
-    """Check if the affiliation belongs to the Max-Planck Institute."""
-    return any(keyword in affiliation for keyword in ['Max Planck', 'Max Plank']) or \
-            any(keyword in affiliation.replace(' ', '') for keyword in ['Max-Planck'])
+    return bool(re.compile(r'max[-\s–]?planck', re.IGNORECASE).search(affiliation))
 
 def load_yaml(file_path, default_return=None):
     path = Path(file_path)

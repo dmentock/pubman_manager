@@ -217,7 +217,6 @@ class PubmanBase:
             return response.json()
         return None
 
-
     def search_publication_by_criteria(self, match_criteria, size=100000):
         must_clauses = []
         for key, value in match_criteria.items():
@@ -252,9 +251,6 @@ class PubmanBase:
         }
 
         headers = self.headers_json
-
-        # print("headers",headers)
-        # print("query",query)
         response = requests.post(
             f"{self.base_url}/items/search",
             headers=headers,
@@ -266,8 +262,6 @@ class PubmanBase:
         else:
             logger.error(f'Failed to get pubman data for match_criteria {match_criteria}, response.status_code { response.status_code}')
             return []
-            # raise Exception("Failed to search for item", response.status_code, response.text)
-
 
     def create_item(self, request_json):
         headers = self.headers_json
