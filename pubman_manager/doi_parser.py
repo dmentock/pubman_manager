@@ -63,41 +63,24 @@ class DOIParser:
     def compare_author_name_to_pure_db(self, pubman_names, first_name, surname) -> Tuple[str]:
         """Match Scopus author names with PuRe author names, preserving formatting from the database."""
         def normalize_name_for_comparison(name):
-            # Remove accents and convert to ASCII
             name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8')
-            # Replace hyphens with spaces
             name = name.replace('-', ' ')
-            # Handle camelCase names by inserting spaces before uppercase letters
             name = re.sub('([a-z])([A-Z])', r'\1 \2', name)
-            # Remove dots
             name = name.replace('.', '')
-            # Convert to lowercase
             name = name.lower()
-            # Remove spaces to get a continuous string for comparison
             name_normalized = ''.join(name.split())
             return name_normalized
-
-        # Normalize incoming surname and first name for comparison
         surname_normalized = normalize_name_for_comparison(surname)
         first_name_normalized = normalize_name_for_comparison(first_name)
-
         for pubman_firstname, pubman_surname in pubman_names:
-            # Normalize names from the database for comparison
             pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
             pubman_firstname_normalized = normalize_name_for_comparison(pubman_firstname)
-
-            # Compare surnames and first names after normalization
             if (surname_normalized == pubman_surname_normalized and
                     first_name_normalized == pubman_firstname_normalized):
-                # Match found; return the original names from the database
                 return pubman_firstname, pubman_surname
-
-        # No match found; return the input name without middle names or initials
-        # Extract the first name without middle names or initials
         if first_name:
             first_name_no_middle = first_name.split()[0]
         else:
-            print("NOFIRSTNAME", first_name, surname)
             first_name_no_middle = ''
         return first_name_no_middle, surname
 
@@ -109,7 +92,6 @@ class DOIParser:
 
         logger.debug(f'Entering compare_author_list_to_pure_db')
         def process_affiliation(affiliation: str) -> str:
-            """Format affiliation string."""
             return affiliation.replace('  ', ', ').replace(') ', '), ')
 
         def handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations):
@@ -274,8 +256,8 @@ class DOIParser:
                         logger.info(f"Successfully downloaded PDF for DOI: {doi}")
                         return True
                     else:
-                        cleaned_html = BeautifulSoup(response.text, "html.parser").text
-                        logger.error(f"Failed to download PDF. Status code: {response.status_code}, {cleaned_html}")
+                        # cleaned_html = BeautifulSoup(response.text, "html.parser").text
+                        logger.error(f"Failed to download PDF. Status code: {response.status_code}")
                         break  # Stop retrying if the server returns a valid response but not a 200.
                 except requests.exceptions.RequestException as e:
                     logger.warning(f"Error downloading PDF on attempt {attempt + 1}: {e}")
@@ -291,55 +273,55 @@ class DOIParser:
                 })
         if not pub and title:
             logger.info(f'Unable to find DOI match in PuRe database, trying to find title instead: "{title}"')
-            title_words = title.split(' ')
-            # print("title_words", [title_words])
-            pub_first_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[:int(len(title_words)//1.5)])})
-            pub_latter_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[int(len(title_words)//1.5):])})
-            if pub_first_half or pub_latter_half:
-                logger.info(f'Found Title match in Database, ignoring new entry')
+            if len(title) < 50:
+                pub = self.pubman_api.search_publication_by_criteria({"metadata.title": title})
+            else:
+                title_words = title.split(' ')
+                pub_first_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[:int(len(title_words)//1.5)])})
+                pub_latter_half = self.pubman_api.search_publication_by_criteria({"metadata.title": ' '.join(title_words[int(len(title_words)//1.5):])})
+                if pub_first_half or pub_latter_half:
+                    logger.info(f'Found Title match in Database, ignoring new entry')
+                else:
+                    pub = pub_first_half if pub_first_half else pub_latter_half
         return bool(pub)
 
-    def get_doi_data_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> pd.DataFrame:
-        import traceback
+    def get_dois_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> List[str]:
+        dois_crossref = self.crossref_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
+        dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
+        return list(set(dois_crossref).union(set(dois_scopus)))
+
+    def collect_data_for_dois(self, dois_crossref: List[str], dois_scopus: List[str], processed_dois=None, force = False) -> pd.DataFrame:
         results = {}
-        try:
-            dois_crossref = self.crossref_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
-            self._process_crossref_dois(dois_crossref, results)
-        except Exception as e:
-            logger.error(f'Failed to retrieve crossref info from author: {e}\n\n{traceback.format_exc()}')
-        try:
-            dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
-            self._process_scopus_dois(dois_scopus, results)
-        except Exception as e:
-            logger.error(f'Failed to retrieve scopus info from author: {e}\n\n{traceback.format_exc()}')
-        return self._generate_results_df(results)
+        dois = set(list(dois_crossref) + list(dois_scopus))
+        processed_dois = set(processed_dois) if processed_dois else set()
+        dois = set(dois)
+        dois_to_process = list(dois - processed_dois)
+        if force:
+            dois_to_skip = []
+        else:
+            dois_to_skip = list(dois & processed_dois)
 
-    def get_data_for_dois(self, dois: List[str]) -> pd.DataFrame:
+            for doi in dois_to_process:
+                if self.has_pubman_entry(doi):
+                    logger.info(f'Found Publication for {doi} in PuRe, skipping...')
+                    dois_to_skip.append(doi)
 
-        results = {}
+            if dois_to_skip:
+                logger.info(f'Skipping already processed dois: {len(dois_to_skip)}')
 
-        self._process_crossref_dois(dois, results)
-        self._process_scopus_dois(dois, results)
-
-        return self._generate_results_df(results)
-
-    def _process_crossref_dois(self, dois: List[str], results: Dict) -> None:
-        """Process Crossref DOIs and update results with their data."""
-        if not dois:
-            return
         with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = {executor.submit(self.crossref_manager.get_overview, doi): doi for doi in dois}
+            futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
+                       for doi in [doi for doi in dois_to_process if doi in dois_crossref and
+                                                                  not doi in dois_to_skip]}
             for future in as_completed(futures):
                 doi, crossref_result = future.result()
                 entry = results.setdefault(doi, {'crossref': False, 'scopus': False})
                 entry.update(crossref_result)
 
-    def _process_scopus_dois(self, dois: List[str], results: Dict) -> None:
-        """Process Scopus DOIs and update results with their data, merging fields."""
-        for doi in dois:
+        for doi in [doi for doi in dois_to_process if doi in dois_scopus and
+                                                   not doi in dois_to_skip]:
             doi, scopus_result = self.scopus_manager.get_overview(doi)
             entry = results.setdefault(doi, {'crossref': False, 'scopus': False})
-            # Merge 'Field' entries
             existing_field = entry.get('Field', '')
             scopus_field = scopus_result.get('Field', '')
             combined_field = existing_field
@@ -348,15 +330,11 @@ class DOIParser:
             scopus_result['Field'] = combined_field.strip()
             entry.update(scopus_result)
 
-    def _generate_results_df(self, results: Dict) -> pd.DataFrame:
-        """Generate the final DataFrame after checking PuRe and processing dates."""
         for doi, info in results.items():
-            # Check PuRe existence
-            if self.has_pubman_entry(doi, title = info.get('Title')):
-                logger.info(f'Found Publication for {doi} in PuRe.')
-                current_field = info.get('Field', '')
-                results[doi]['Field'] = f"{current_field}\nAlready exists in PuRe".strip()
-            # Process publication dates
+            # if self.has_pubman_entry(doi, title = info.get('Title')):
+            #     logger.info(f'Found Publication for {doi} in PuRe.')
+            #     current_field = info.get('Field', '')
+            #     results[doi]['Field'] = f"{current_field}\nAlready exists in PuRe".strip()
             pub_date = info.get('Publication Date')
             if pub_date:
                 parsed_date = self.parse_date(pub_date)
@@ -365,12 +343,16 @@ class DOIParser:
                 )
             else:
                 results[doi]['Publication Date'] = pd.NaT
+        if not results:
+            return None
         df = pd.DataFrame.from_dict(results, orient='index').reset_index()
         df.rename(columns={'index': 'DOI'}, inplace=True)
         df = df.sort_values('Publication Date')
         return df
 
-    def collect_data_for_dois(self, df_dois_overview: pd.DataFrame, processed_dois: List[str], force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
+    def generate_table_from_dois_data(self,
+                                      dois_data: pd.DataFrame,
+                                      force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
         Takes overview dataframe, collects all data for DOIs which are not yet on PuRe and have Scopus and Crossref entries.
         Generates dataframe which can be passed to the excel_generator.create_sheet method to prefill the sheet with data.
@@ -381,21 +363,17 @@ class DOIParser:
         Each entry in the result list is a dict that corresponds to a publication.
         The dict maps column data to a tuple, e.g. `"Title": (title, 35)`
         Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
+
         """
-        print("df_dois_overview",df_dois_overview)
-        dois_data = []
-        for index, row in df_dois_overview.iterrows():
+        table_overview = []
+        for index, row in dois_data.iterrows():
             if str(row['Field']).strip() and not force:
                 logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
                 continue
 
             doi = row['DOI']
-            if doi in processed_dois:
-                logger.info(f'Skipping {row["DOI"]}, already previously processed...')
-                continue
 
             logger.debug(f"Processing Publication DOI {doi}")
-            print(row['Title'], row['crossref'], row['scopus'])
 
             def clean_html(raw_html):
                 soup = BeautifulSoup(raw_html, "html.parser")
@@ -416,6 +394,7 @@ class DOIParser:
                     skip = True
                     break
             if skip:
+
                 continue
 
             link = crossref_metadata.get('resource', {}).get('primary', {}).get('URL', '')
@@ -460,6 +439,57 @@ class DOIParser:
                               (f"{date_issued_crossref[0][0]}")
 
 
+            from datetime import date
+            from calendar import monthrange
+
+            def is_older_than_six_months(s: str, today: date | None = None) -> bool:
+                today = today or date.today()
+
+                # cutoff = today minus 6 calendar months (day clamped to target month length)
+                total = today.year * 12 + (today.month - 1) - 6
+                cy, m0 = divmod(total, 12)
+                cm = m0 + 1
+                cutoff = date(cy, cm, min(today.day, monthrange(cy, cm)[1]))
+
+                t = s.strip().replace("/", "-").replace(".", "-")
+                parts = t.split("-")
+
+                def end_of_month(y, m): return date(y, m, monthrange(y, m)[1])
+
+                # Parse to the *latest possible* date consistent with the input (conservative)
+                if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:
+                    y = int(parts[0]); end = date(y, 12, 31)
+
+                elif len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    a, b = parts
+                    if len(a) == 4:   # YYYY-MM
+                        y, m = int(a), int(b)
+                    elif len(b) == 4: # MM-YYYY
+                        y, m = int(b), int(a)
+                    else:
+                        raise ValueError(f"Ambiguous 2-part date: {s!r}")
+                    if not (1 <= m <= 12): raise ValueError(f"Invalid month: {m}")
+                    end = end_of_month(y, m)
+
+                elif len(parts) == 3 and all(p.isdigit() for p in parts):
+                    a, b, c = parts
+                    if len(a) == 4:            # YYYY-MM-DD
+                        y, m, d = int(a), int(b), int(c)
+                    elif len(c) == 4:          # DD-MM-YYYY (day-first)
+                        y, m, d = int(c), int(b), int(a)
+                    else:
+                        raise ValueError(f"Ambiguous 3-part date: {s!r}")
+                    if not (1 <= m <= 12): raise ValueError(f"Invalid month: {m}")
+                    if not (1 <= d <= monthrange(y, m)[1]): raise ValueError(f"Invalid day: {d}")
+                    end = date(y, m, d)
+                else:
+                    raise ValueError(f"Unrecognized date format: {s!r}")
+                return end < cutoff
+
+            if not page and not article_number and not is_older_than_six_months(date_issued):
+                logger.info(f'Skipping {row["DOI"]}, no page or article number specified and newer than 6 months, probably still a preprint')
+                continue
+
             cleaned_author_list = self.compare_author_list_to_pure_db(affiliations_by_name)
             has_institute_publication = False
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
@@ -468,7 +498,6 @@ class DOIParser:
                         has_institute_publication = True
             if not has_institute_publication:
                 logger.error('Publication has no author from Max Planck Institute, skipping...')
-                processed_dois.append(doi)
                 continue
 
             missing_pdf = True if license_type!='closed' and not pdf_found else False
@@ -503,9 +532,8 @@ class DOIParser:
                                                                    compare_error = affiliation_info['compare_error'],
                                                                    comment = affiliation_info['comment'])
                     i = i+1
-            dois_data.append(prefill_publication)
-            processed_dois.append(doi)
-        return dois_data
+            table_overview.append(prefill_publication)
+        return table_overview
 
     def write_dois_data(self, path_out, dois_data):
         if not dois_data:
