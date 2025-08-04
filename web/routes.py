@@ -39,13 +39,14 @@ def login():
     form = LoginForm()
     if form.validate_on_submit():
         try:
-            print("oops")
             username = form.username.data
             auth_token, user_id, = PubmanCreator.login(username, form.password.data)
             user_info = PubmanCreator.get_user_info(auth_token, user_id)
             ctx_id = user_info['ctx_id']
             org_id = user_info['org_id']
-            with open(Path(__file__).parent / 'users.yaml', 'r') as f:
+            user_name = user_info['user_name']
+            print("user_name",user_name)
+            with open(Path(__file__).parent / 'users' / f'{user_name}.yaml', 'r') as f:
                 users = yaml.safe_load(f)
             if org_id not in {user['org_id'] for user in users.values()}:
                 update_cache(org_id)

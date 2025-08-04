@@ -444,22 +444,15 @@ class DOIParser:
 
             def is_older_than_six_months(s: str, today: date | None = None) -> bool:
                 today = today or date.today()
-
-                # cutoff = today minus 6 calendar months (day clamped to target month length)
                 total = today.year * 12 + (today.month - 1) - 6
                 cy, m0 = divmod(total, 12)
                 cm = m0 + 1
                 cutoff = date(cy, cm, min(today.day, monthrange(cy, cm)[1]))
-
                 t = s.strip().replace("/", "-").replace(".", "-")
                 parts = t.split("-")
-
                 def end_of_month(y, m): return date(y, m, monthrange(y, m)[1])
-
-                # Parse to the *latest possible* date consistent with the input (conservative)
                 if len(parts) == 1 and parts[0].isdigit() and len(parts[0]) == 4:
                     y = int(parts[0]); end = date(y, 12, 31)
-
                 elif len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
                     a, b = parts
                     if len(a) == 4:   # YYYY-MM
@@ -470,7 +463,6 @@ class DOIParser:
                         raise ValueError(f"Ambiguous 2-part date: {s!r}")
                     if not (1 <= m <= 12): raise ValueError(f"Invalid month: {m}")
                     end = end_of_month(y, m)
-
                 elif len(parts) == 3 and all(p.isdigit() for p in parts):
                     a, b, c = parts
                     if len(a) == 4:            # YYYY-MM-DD
