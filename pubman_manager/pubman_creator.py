@@ -1,4 +1,3 @@
-from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR, FILES_DIR
 import pandas as pd
 from collections import OrderedDict
 from dateutil.parser import ParserError
@@ -12,6 +11,9 @@ import requests
 import logging
 import re
 import math
+
+from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR, FILES_DIR
+from pubman_manager.util import is_mpi_affiliation
 
 logger = logging.getLogger(__name__)
 
@@ -27,15 +29,14 @@ class PubmanCreator(PubmanBase):
 
     def parse_excel_table(self, file_path):
         def find_header_row(df):
-            for i, row in df.iterrows():
-                if row[0] == 1:
+            for i in range(len(df)):
+                if not pd.isna(df.iloc[i, 1]) and str(df.iloc[i, 1]).strip() != 'Title':
                     return i - 2
         def find_end_row(df, start_row):
             for i in range(start_row, len(df)):
                 if pd.isna(df.iloc[i, 1]) or df.iloc[i, 1].strip() == '':
                     return i - 1
             return len(df) - 1
-        print("file_path",file_path)
         df_full = pd.read_excel(file_path, engine='openpyxl', header=None)
         header_row = find_header_row(df_full)
         start_row = header_row + 2
@@ -126,10 +127,12 @@ class PubmanCreator(PubmanBase):
                 given_name, family_name = self.get_first_and_last_name_from_concat(author)
                 affiliation_list = []
                 for affiliation in info['affiliations']:
+                    affiliation_entry = {"name": self.clean_affiliation(affiliation), "identifierPath" : [ "" ]}
                     if affiliation in self.identifier_paths.keys():
-                        affiliation_list.append({"name": self.clean_affiliation(affiliation), "identifier": self.identifier_paths[affiliation][0], "identifierPath" : [ "" ]})
-                    else:
-                        affiliation_list.append({"name": self.clean_affiliation(affiliation), "identifier": 'ou_persistent22', "identifierPath" : [ "" ]})
+                        affiliation_entry["identifier"] = self.identifier_paths[affiliation][0]
+                    elif not is_mpi_affiliation(affiliation):
+                        affiliation_entry["identifier"] =  'ou_persistent22'
+                    affiliation_list.append(affiliation_entry)
                 identifier = info.get('identifier')
                 metadata_creators.append({
                     "person": {
@@ -196,7 +199,7 @@ class PubmanCreator(PubmanBase):
         pdf_path = Path(pdf_path)
         file_title = pdf_path.name
 
-        # TODO: find way to check if the file with the same title already exists
+        # TODO: find way to check if the file with the same title already exists before uploading to scopus again
         # existing_file_id = self.search_file_by_title(file_title)
         # if existing_file_id:
         #     print(f"File with title '{file_title}' already exists. Returning existing file ID: {existing_file_id}")
@@ -299,22 +302,13 @@ class PubmanCreator(PubmanBase):
             doi = str(row.get("DOI"))
 
             date_issued_sheet = str(row.get('Date issued'))
-            print("date_issued_sheet",date_issued_sheet)
             date_issued_parsed = self.safe_date_parse(str(date_issued_sheet)) if date_issued_sheet else None
-            print("date_issued_parsed",date_issued_parsed)
             date_issued = self.format_date(date_issued_parsed, date_issued_sheet) if date_issued_parsed else None
-            print("date_issued",date_issued)
-
             date_published_sheet = str(row.get('Date published online'))
             date_published_parsed = self.safe_date_parse(str(date_published_sheet)) if date_published_sheet else None
             date_published_online = self.format_date(date_published_parsed, date_published_sheet) if date_published_parsed else None
 
-
             journalname_in_pubman = self.get_best_journal_match(row.get('Journal Title', ''))
-            # print("JOUR", row.get('Journal Title', ''))
-            # print("jos", journalname_in_pubman)
-            # print("row.get('Title')",row.get('Title'))
-            # continue
             identifiers = self.journals.get(journalname_in_pubman, {}).get('identifiers', {})
             identifiers['ISSN'] = self.clean_scalar(row.get('ISSN'))
             identifiers_list = [{'type': key, 'id': id} for key, id in
@@ -338,7 +332,7 @@ class PubmanCreator(PubmanBase):
                 sources[0]['sequenceNumber'] = article_number
 
             files = []
-            pdf_path = Path(FILES_DIR / f'{doi.replace("/", "_")}.pdf')
+            pdf_path = Path(FILES_DIR / f'{doi.replace("/", "")}.pdf')
             if self.clean_scalar(row.get('License url')):
                 if not pdf_path.exists():
                     logger.error(f'PDF for DOI {doi} not found in {pdf_path}')
@@ -446,7 +440,6 @@ class PubmanCreator(PubmanBase):
                     continue
             if create_items:
                 logger.info(f"Creating new publication: '{criteria}'")
-                print("request_json",request_json)
                 created_item = self.create_item(request_json)
             if created_item:
                 item_ids.append((created_item['objectId'], created_item['lastModificationDate'], created_item['versionState']))

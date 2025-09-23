@@ -1,9 +1,10 @@
 import xlsxwriter
 from collections import OrderedDict, Counter
+import pandas as pd
 
 class Cell:
     def __init__(self, data, width=None, color='', comment='', compare_error=None, force_text=False):
-        self.data = data
+        self.data = '' if not data or pd.isna(data) else data
         self.width = width
         self.color = color
         self.comment = comment

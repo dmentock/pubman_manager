@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict, Counter
-from dateutil import parser
 import yaml
 from fuzzywuzzy import process
 import requests
@@ -17,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
+from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
 
@@ -42,23 +42,6 @@ class DOIParser:
                     mpi_affiliation_counter[affiliation]+=1
         self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.af_id_ = None
-
-    def parse_date(self, date_value):
-        if isinstance(date_value, str):
-            parsed_date = parser.parse(date_value)
-            return parsed_date.strftime("%d.%m.%Y")
-        elif isinstance(date_value, list) and all(isinstance(i, int) for i in date_value):
-            if len(date_value) == 3:
-                year, month, day = date_value
-                parsed_date = parser.parse(f"{day:02d}.{month:02d}.{year}")
-                return parsed_date.strftime("%d.%m.%Y")
-            elif len(date_value) == 2:
-                year, month = date_value
-                parsed_date = parser.parse(f"{month:02d}.{year}")
-                return parsed_date.strftime("%m.%Y")
-            elif len(date_value) == 1:
-                return date_value[0]
-        raise RuntimeError
 
     def compare_author_name_to_pure_db(self, pubman_names, first_name, surname) -> Tuple[str]:
         """Match Scopus author names with PuRe author names, preserving formatting from the database."""
@@ -290,64 +273,44 @@ class DOIParser:
         dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
         return list(set(dois_crossref).union(set(dois_scopus)))
 
-    def collect_data_for_dois(self, dois_crossref: List[str], dois_scopus: List[str], processed_dois=None, force = False) -> pd.DataFrame:
+    def collect_data_for_dois(self, dois_crossref: List[str], dois_scopus: List[str], processed_dois=None) -> pd.DataFrame:
         results = {}
         dois = set(list(dois_crossref) + list(dois_scopus))
         processed_dois = set(processed_dois) if processed_dois else set()
         dois = set(dois)
         dois_to_process = list(dois - processed_dois)
-        if force:
-            dois_to_skip = []
-        else:
-            dois_to_skip = list(dois & processed_dois)
+        dois_to_skip = list(dois & processed_dois)
 
-            for doi in dois_to_process:
-                if self.has_pubman_entry(doi):
-                    logger.info(f'Found Publication for {doi} in PuRe, skipping...')
-                    dois_to_skip.append(doi)
+        for doi in dois_to_process:
+            if self.has_pubman_entry(doi):
+                logger.info(f'Found Publication for {doi} in PuRe, skipping...')
+                dois_to_skip.append(doi)
 
-            if dois_to_skip:
-                logger.info(f'Skipping already processed dois: {len(dois_to_skip)}')
+        if dois_to_skip:
+            logger.info(f'Skipping already processed dois: {len(dois_to_skip)}')
 
+        results = {}
         with ThreadPoolExecutor(max_workers=2) as executor:
             futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
-                       for doi in [doi for doi in dois_to_process if doi in dois_crossref and
-                                                                  not doi in dois_to_skip]}
+                    for doi in [d for d in dois_to_process if d in dois_crossref and d not in dois_to_skip]}
             for future in as_completed(futures):
-                doi, crossref_result = future.result()
-                entry = results.setdefault(doi, {'crossref': False, 'scopus': False})
-                entry.update(crossref_result)
+                doi = futures[future]
+                crossref_result = future.result()
+                results[doi] = crossref_result
+        for doi in [doi for doi in dois_to_process if not doi in dois_to_skip]:
+            scopus_result = self.scopus_manager.get_overview(doi)
+            if scopus_result:
+                if doi not in results:
+                    results[doi] = scopus_result
+                else: # if we already have a crossref entry, we merge the results
+                    results[doi]['scopus'] = scopus_result['scopus']
+                    if scopus_result.get('Field'):
+                        results[doi]['Field'] = results[doi].get('Field', []) + scopus_result['Field']
 
-        for doi in [doi for doi in dois_to_process if doi in dois_scopus and
-                                                   not doi in dois_to_skip]:
-            doi, scopus_result = self.scopus_manager.get_overview(doi)
-            entry = results.setdefault(doi, {'crossref': False, 'scopus': False})
-            existing_field = entry.get('Field', '')
-            scopus_field = scopus_result.get('Field', '')
-            combined_field = existing_field
-            if scopus_field:
-                combined_field = f"{existing_field}\n{scopus_field}" if existing_field else scopus_field
-            scopus_result['Field'] = combined_field.strip()
-            entry.update(scopus_result)
-
-        for doi, info in results.items():
-            # if self.has_pubman_entry(doi, title = info.get('Title')):
-            #     logger.info(f'Found Publication for {doi} in PuRe.')
-            #     current_field = info.get('Field', '')
-            #     results[doi]['Field'] = f"{current_field}\nAlready exists in PuRe".strip()
-            pub_date = info.get('Publication Date')
-            if pub_date:
-                parsed_date = self.parse_date(pub_date)
-                results[doi]['Publication Date'] = pd.to_datetime(
-                    parsed_date, format='%d.%m.%Y', errors='coerce'
-                )
-            else:
-                results[doi]['Publication Date'] = pd.NaT
         if not results:
             return None
         df = pd.DataFrame.from_dict(results, orient='index').reset_index()
         df.rename(columns={'index': 'DOI'}, inplace=True)
-        df = df.sort_values('Publication Date')
         return df
 
     def generate_table_from_dois_data(self,
@@ -367,7 +330,7 @@ class DOIParser:
         """
         table_overview = []
         for index, row in dois_data.iterrows():
-            if str(row['Field']).strip() and not force:
+            if not pd.isna(row['Field']) and row['Field'] not in (None, '', 0, False) and not force:
                 logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
                 continue
 
@@ -418,7 +381,7 @@ class DOIParser:
             license_type = 'open'
             pdf_found = self.download_pdf(crossref_metadata.get('link', [{}])[0].get('URL'), doi)
 
-            if row['scopus'] and self.scopus_manager.get_metadata(doi).get('abstracts-retrieval-response'):
+            if row.get('scopus') and self.scopus_manager.get_metadata(doi).get('abstracts-retrieval-response'):
                 scopus_metadata = self.scopus_manager.get_metadata(doi)
                 affiliations_by_name = self.scopus_manager.extract_authors_affiliations(scopus_metadata)
                 if not affiliations_by_name:
@@ -493,7 +456,6 @@ class DOIParser:
                 continue
 
             missing_pdf = True if license_type!='closed' and not pdf_found else False
-
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
                 "Journal Title": Cell(journal_title, 25),
@@ -503,7 +465,7 @@ class DOIParser:
                 "Page": Cell(page, 10, color='red' if not article_number and not page else ''),
                 'Article Number': Cell(article_number, 10, color='red' if not article_number and not page else '', force_text=True),
                 "ISSN": Cell(html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15),
-                "Date published online": Cell(self.parse_date(crossref_metadata.get('created', {}).get('date-time', None)), 20, force_text=True),
+                "Date published online": Cell(date_to_cell(crossref_metadata.get('created', {}).get('date-time', None)), 20, force_text=True),
                 'Date issued': Cell(date_issued, 20, force_text=True),
                 'DOI': Cell(doi, 20, force_text=True),
                 'License url': Cell(license_url if license_type=='open' else '', 20),
@@ -512,8 +474,8 @@ class DOIParser:
                                   color='red' if missing_pdf else '',
                                   comment = 'Please upload the file and license info when submitting in PuRe'
                                   if missing_pdf else ''),
-                'Link': Cell(link, 20),
-                'Using Scopus': Cell(str(row['scopus']), 15)
+                'Crossref Link': Cell(link, 20),
+                'Scopus Link': Cell(row.get('scopus', ''), 15)
             })
             i = 1
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():

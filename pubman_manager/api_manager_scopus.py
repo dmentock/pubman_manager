@@ -7,6 +7,7 @@ import logging
 from urllib.parse import urlencode
 
 from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, is_mpi_affiliation
+from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
 
@@ -64,51 +65,45 @@ class ScopusManager:
                 self.last_request = time.time()
                 response.raise_for_status()
                 self.metadata_map[doi] = response.json()
-                logger.debug(f'scopus_metadata {response.json()}')
-                return response.json()
             except requests.HTTPError as e:
                 logger.error(f"Failed to retrieve Scopus data for DOI {doi}: {e}")
-                return None
+                self.metadata_map[doi] = {}
         return self.metadata_map[doi]
 
     def get_overview(self, doi):
         """Fetch overview from Scopus for the given DOI."""
         scopus_metadata = self.get_metadata(doi)
         overview = {}
-        overview['scopus'] = False
         if scopus_metadata:
             # Fetch title and publication date from scopus_metadata
             title = scopus_metadata['abstracts-retrieval-response']['coredata'].get('dc:title', 'Unknown Title')
             if title:
                 overview['Title']  = title
-            publication_date = scopus_metadata['abstracts-retrieval-response']['coredata'].get('prism:coverDate', 'Unknown Date')
-            if publication_date:
-                overview['Publication Date'] = publication_date
+            publication_date = scopus_metadata['abstracts-retrieval-response']['coredata'].get('prism:coverDate')
+            overview['Publication Date'] = date_to_cell(publication_date)
             author_affiliation_map = self.extract_authors_affiliations(scopus_metadata)
             is_mp_publication = False
             has_any_affiliations = False
             for (first_name, last_name), affiliations in author_affiliation_map.items():
                 for affiliation in affiliations:
-                    # print("(first_name, last_name)",(first_name, last_name), affiliation)
+                    print("(first_name, last_name)",(first_name, last_name), affiliation)
                     if not has_any_affiliations:
                         # print("oop")
                         has_any_affiliations = True
                     if is_mpi_affiliation(affiliation):
-                        # print("ISMPI")
+                        print("ISMPI")
                         is_mp_publication = True
                         break
                 if is_mp_publication:
-                    # print("breaking")
+                    print("breaking")
                     break
-            # print("has_any_affiliations", has_any_affiliations)
-            # print("is_mp_publication", is_mp_publication)
+            print("has_any_affiliations", has_any_affiliations)
+            print("is_mp_publication", is_mp_publication)
             if has_any_affiliations and not is_mp_publication:
-                overview['Field'] = f'Authors have no Max-Planck affiliation (Scopus)'
+                overview['Field'] = [f'Authors have no Max-Planck affiliation (Scopus)']
             scopus_id = scopus_metadata['abstracts-retrieval-response']['coredata']['prism:url'].split('/')[-1]
             overview['scopus'] = f"https://www.scopus.com/inward/record.uri?partnerID=HzOxMe3b&scp={scopus_id}&origin=inward"
-        else:
-            overview['Field'] = 'Publication not found on Scopus'
-        return doi, overview
+        return overview
 
     def get_author_full_name(self, author_id):
         author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
@@ -153,57 +148,6 @@ class ScopusManager:
                                 f"(status code: {response.status_code}, {response.text})")
             time.sleep(30)
 
-    def format_affiliation(self,record: dict) -> str:
-        aff = record.get('affiliation', record)
-
-        def to_text(v):
-            """Return cleaned text from str or dicts that use '$' / '#text' keys."""
-            if v is None:
-                return None
-            if isinstance(v, str):
-                s = v.strip()
-                return s or None
-            if isinstance(v, dict):
-                for k in ('$', '#text', 'text'):
-                    if k in v and isinstance(v[k], str):
-                        s = v[k].strip()
-                        return s or None
-            return None
-
-        def as_list(v):
-            if v is None:
-                return []
-            return v if isinstance(v, list) else [v]
-
-        # Organizations can be a dict or a list of dicts/strings
-        orgs = []
-        for item in as_list(aff.get('organization')):
-            t = to_text(item)
-            if t:
-                orgs.append(t)
-        # de-duplicate but keep original order
-        orgs = list(dict.fromkeys(orgs))
-
-        # Optional fields
-        dept   = to_text(aff.get('affilname'))                      # department
-        street = to_text(aff.get('address-part')) or to_text(aff.get('street')) or to_text(aff.get('address'))
-        city   = to_text(aff.get('city'))
-        region = to_text(aff.get('state')) or to_text(aff.get('region')) or to_text(aff.get('state-prov'))
-        postal = to_text(aff.get('postal-code')) or to_text(aff.get('postcode'))
-        country= to_text(aff.get('country'))
-
-        parts = []
-        parts.extend(orgs)                # Institute, University, …
-        if dept:
-            parts.append(dept)            # Department, Chair, …
-        # Address tail (order: street, city, region, postal, country)
-        for x in (street, city, region, postal, country):
-            if x:
-                parts.append(x)
-
-        return ', '.join(parts)
-
-
     def extract_authors_affiliations(self, scopus_metadata) -> "OrderedDict[Tuple[str, str], List[str]]":
         """
         Build an ordered mapping (first_name, surname) -> list of affiliation strings.
@@ -239,13 +183,12 @@ class ScopusManager:
             return None
 
         def _format_affiliation(aff: Dict[str, Any]) -> str:
-            # organizations: dict or list
             orgs = []
             for item in _as_list(aff.get('organization')):
                 t = _text(item)
                 if t:
                     orgs.append(t)
-            orgs = list(dict.fromkeys(orgs))  # de-duplicate, keep order
+            orgs = list(dict.fromkeys(orgs))
 
             dept   = _text(aff.get('affilname'))
             street = _text(aff.get('address-part')) or _text(aff.get('street')) or _text(aff.get('address'))
@@ -265,7 +208,6 @@ class ScopusManager:
             if parts:
                 return ', '.join(parts)
 
-            # Fallback: use raw source-text if nothing else was usable
             src = _text(aff.get('ce:source-text'))
             return src or ""
 
@@ -276,9 +218,7 @@ class ScopusManager:
             logger.warning('No info found in Scopus')
             return OrderedDict()
 
-        # Build AUID -> affiliations (possibly multiple groups)
         auid_to_affs: Dict[str, List[str]] = {}
-
         author_groups = _get(abstracts, 'item', 'bibrecord', 'head', 'author-group', default=[])
         author_groups = _as_list(author_groups)
 
@@ -397,7 +337,7 @@ class ScopusManager:
 
             if response.status_code == 200:
                 data = response.json()
-                logger.debug(f'Scopus data: {data}')
+                logger.info(f'Scopus data: {data}')
 
                 total_results = int(data['search-results']['opensearch:totalResults'])
                 entries = data['search-results'].get('entry', [])

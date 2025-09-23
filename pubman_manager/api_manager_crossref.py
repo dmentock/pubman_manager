@@ -8,6 +8,7 @@ from typing import List, Dict, Tuple, Any
 import logging
 
 from pubman_manager import is_mpi_affiliation
+from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
 
@@ -30,46 +31,39 @@ class CrossrefManager:
     def get_overview(self, doi):
         crossref_metadata = self.get_metadata(doi)
         if not crossref_metadata:
-            return doi, {}
+            return {}
 
         title = crossref_metadata.get('title', [None])[0] if crossref_metadata else 'Unknown Title'
-        publication_date = crossref_metadata.get('published-online', {}).get('date-parts', [None])[0] if crossref_metadata else 'Unknown Date'
+        publication_date = crossref_metadata.get('published-online', {}).get('date-parts', [None])[0] if crossref_metadata else None
 
         overview = {
             'Title': title,
-            'Publication Date': publication_date,
+            'Publication Date': date_to_cell(publication_date),
             'crossref': f"https://doi.org/{doi}"
         }
 
-
-        field = ''
+        field = []
         if (isbn:=crossref_metadata.get('ISBN')):
             logger.info(f'Skipping Book DOI: {doi}')
-            field += f'Has ISBN: {isbn}'
+            field.append(f'Has ISBN: {isbn}')
 
         else:
             author_affiliation_map = self.extract_authors_affiliations(crossref_metadata)
             is_mp_publication = False
             has_any_affiliations = False
-            for (first_name, last_name), affiliations in author_affiliation_map.items():
+            for affiliations in author_affiliation_map.values():
                 for affiliation in affiliations:
-                    print("(first_name, last_name)",(first_name, last_name), affiliation)
                     if not has_any_affiliations:
-                        print("oop")
                         has_any_affiliations = True
                     if is_mpi_affiliation(affiliation):
-                        print("ISMPI")
                         is_mp_publication = True
                         break
                 if is_mp_publication:
-                    print("breaking")
                     break
-            print("has_any_affiliations",has_any_affiliations)
-            print("is_mp_publication",is_mp_publication)
             if has_any_affiliations and not is_mp_publication:
-                field += ('\n' if field else '') + f'Authors have no Max-Planck affiliation (Crossref)'
+                field.append(f'Authors have no Max-Planck affiliation (Crossref)')
         overview['Field'] = field
-        return doi, overview
+        return overview
 
     def extract_authors_affiliations(self, crossref_metadata):
         affiliations_by_name = OrderedDict()
