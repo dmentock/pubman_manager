@@ -13,6 +13,8 @@ import logging
 
 from pubman_manager import PubmanBase, PubmanExtractor, DOIParser, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
 
+logger = logging.getLogger(__name__)
+
 extractor = PubmanExtractor()
 
 def update_cache(org_id):
@@ -37,7 +39,6 @@ def update_cache(org_id):
 
 def get_file_for_dois(dois, doi_parser):
     df_dois_overview = doi_parser.filter_dois(dois)
-    print("df_dois_overview",df_dois_overview)
     dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     doi_parser.write_dois_data(temp_file.name, dois_data)
@@ -63,7 +64,7 @@ def get_user_dois(user_id, doi_parser, author_publications=None):
             author_publications[tracked_author] = doi_parser.get_dois_for_author(tracked_author, pubyear_start=2024)
         df = author_publications[tracked_author]
         if df.empty:
-            print(f"No data found for author {tracked_author}. Skipping...")
+            logger.warning(f"No data found for author {tracked_author}. Skipping...")
             continue
         new_dois.update(
             df.loc[
@@ -88,8 +89,6 @@ def send_test_mail_(target):
         server.sendmail(sender_email, recipient_email, msg.as_string())
 
 def send_author_publications(new_publication_dois, user_email, doi_parser):
-
-    print("new_publication_dois", new_publication_dois)
     temp_file_path = get_file_for_dois(new_publication_dois, doi_parser)
 
     sender_email = 'pubman_manager@mpie.de'
@@ -113,12 +112,12 @@ def send_author_publications(new_publication_dois, user_email, doi_parser):
         )
         msg.attach(part)
     else:
-        print(f"Attachment file {temp_file_path} not found or invalid.")
+        logger.info(f"Attachment file {temp_file_path} not found or invalid.")
     smtp_server = "xmail1.mpie.de"
     smtp_port = 25
     with smtplib.SMTP(smtp_server, smtp_port) as server:
         server.sendmail(sender_email, recipient_email, msg.as_string())
-    print("Email sent successfully.")
+    logger.info("Email sent successfully.")
 
 def send_publications():
     pass

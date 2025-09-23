@@ -86,19 +86,13 @@ class ScopusManager:
             has_any_affiliations = False
             for (first_name, last_name), affiliations in author_affiliation_map.items():
                 for affiliation in affiliations:
-                    print("(first_name, last_name)",(first_name, last_name), affiliation)
                     if not has_any_affiliations:
-                        # print("oop")
                         has_any_affiliations = True
                     if is_mpi_affiliation(affiliation):
-                        print("ISMPI")
                         is_mp_publication = True
                         break
                 if is_mp_publication:
-                    print("breaking")
                     break
-            print("has_any_affiliations", has_any_affiliations)
-            print("is_mp_publication", is_mp_publication)
             if has_any_affiliations and not is_mp_publication:
                 overview['Field'] = [f'Authors have no Max-Planck affiliation (Scopus)']
             scopus_id = scopus_metadata['abstracts-retrieval-response']['coredata']['prism:url'].split('/')[-1]

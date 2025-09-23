@@ -45,7 +45,6 @@ def login():
             ctx_id = user_info['ctx_id']
             org_id = user_info['org_id']
             user_name = user_info['user_name']
-            print("user_name",user_name)
             with open(Path(__file__).parent / 'users' / f'{user_name}.yaml', 'r') as f:
                 users = yaml.safe_load(f)
             if org_id not in {user['org_id'] for user in users.values()}:
@@ -58,7 +57,6 @@ def login():
                 with open('users.yaml', 'w') as f:
                     yaml.dump(users, f)
 
-            print("keke")
             pubman_creator = PubmanCreator(auth_token=auth_token, user_id=user_id)
             doi_parser = DOIParser(pubman_creator)
             user = User(username)
@@ -147,7 +145,6 @@ def set_or_send_tracked_authors():
     action = request.form.get('action')
     authors = request.form.get('tracked_authors', '').splitlines()
     authors = [author.strip() for author in authors if author.strip()]
-    print("authors", authors)
     try:
         with open(Path(__file__).parent / 'users.yaml', 'r') as f:
             users = yaml.safe_load(f)
@@ -171,7 +168,6 @@ def set_or_send_tracked_authors():
 def ignored_dois_str():
     ignored_dois = request.form.get('ignored_dois', '').splitlines()
     ignored_dois = [author.strip() for author in ignored_dois if author.strip()]
-    print("ignored_dois", ignored_dois)
     try:
         with open(Path(__file__).parent / 'users.yaml', 'r') as f:
             users = yaml.safe_load(f)
