@@ -1,31 +1,64 @@
-import time
+from fuzzywuzzy import process as fuzz
 from unidecode import unidecode
 from bs4 import BeautifulSoup
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict, Counter
 import yaml
-from fuzzywuzzy import process
 import requests
 import unicodedata
-from typing import List, Dict, Tuple, Any
 import os
 import html
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
+from enum import Enum
+from dataclasses import dataclass
+
+from typing import List, Dict, Tuple, Iterable, Optional
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
 from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
 
+AFFILIATION_MATCH_THRESHOLD = 90
 
-pd.set_option('display.max_columns', None)     # Show all columns
-pd.set_option('display.max_rows', None)        # Show all rows
-pd.set_option('display.max_colwidth', None)    # No truncation in columns
-pd.set_option('display.width', None)           # Prevent line wrapping
-pd.set_option('display.expand_frame_repr', False)  # Single-line display for wide DataFrames
+
+class DecisionColor(Enum):
+    def __new__(cls, comment: str):
+        obj = object.__new__(cls)
+        obj._value_ = len(cls.__members__) + 1
+        obj.comment = comment
+        return obj
+
+    GREEN   = "PuRe match"                     # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
+    GRAY    = "Using publisher affiliation"    # external/publisher adopted
+    PURPLE  = "MPI affiliation detected"       # any MPI case (match/ambiguous/missing/resolved)
+    RED = "No affiliation information"     # nothing available
+
+
+@dataclass
+class AffiliationResult:
+    affiliation: str
+    color: DecisionColor
+    compare_error: float = 0.0
+
+    @property
+    def comment(self) -> str:
+        return self.color.comment + (f' {self.compare_error}' if self.compare_error else '')
+
+
+def normalize_affiliation(text: str) -> str:
+    return (text or "").replace("  ", ", ").replace(") ", "), ").strip()
+
+def find_best_fuzzy_match(proposed: str, candidates: Iterable[str]) -> Tuple[Optional[str], float]:
+    candidates = list(candidates)
+    if not proposed or not candidates:
+        return None, 1.0
+    match, score = fuzz.extractOne(proposed, candidates)  # score in [0..100]
+    compare_error = (100 - score) / 100.0
+    return (match if score >= AFFILIATION_MATCH_THRESHOLD else None), compare_error
 
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None):
@@ -43,167 +76,116 @@ class DOIParser:
         self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.af_id_ = None
 
-    def compare_author_name_to_pure_db(self, pubman_names, first_name, surname) -> Tuple[str]:
-        """Match Scopus author names with PuRe author names, preserving formatting from the database."""
-        def normalize_name_for_comparison(name):
-            name = unicodedata.normalize('NFD', name).encode('ascii', 'ignore').decode('utf-8')
-            name = name.replace('-', ' ')
-            name = re.sub('([a-z])([A-Z])', r'\1 \2', name)
-            name = name.replace('.', '')
-            name = name.lower()
-            name_normalized = ''.join(name.split())
-            return name_normalized
-        surname_normalized = normalize_name_for_comparison(surname)
-        first_name_normalized = normalize_name_for_comparison(first_name)
-        for pubman_firstname, pubman_surname in pubman_names:
-            pubman_surname_normalized = normalize_name_for_comparison(pubman_surname)
-            pubman_firstname_normalized = normalize_name_for_comparison(pubman_firstname)
-            if (surname_normalized == pubman_surname_normalized and
-                    first_name_normalized == pubman_firstname_normalized):
-                return pubman_firstname, pubman_surname
-        if first_name:
-            first_name_no_middle = first_name.split()[0]
-        else:
-            first_name_no_middle = ''
-        return first_name_no_middle, surname
-
-    def compare_author_list_to_pure_db(self, affiliations_by_name: Dict[str, List[str]]) -> Dict[str, List[Dict[str, Any]]]:
+    def compare_author_name_to_pure_db(
+        self,
+        pure_author_names: Iterable[Tuple[str, str]],
+        first_name: str,
+        surname: str,
+    ) -> Tuple[str, str]:
         """
-        Go over list of authors and affiliations from Scopus/Crossref, compare to PuRe entries,
-        and possibly adopt PuRe if differences are small.
+        Compare name to all authors in PuRe DB to make sure middle names or different writing styles match.
+
+        Returns corrected name if correction was needed.
+        """
+        def normalize_name_for_comparison(name: str) -> str:
+            ascii_name = unicodedata.normalize("NFD", name).encode("ascii", "ignore").decode("utf-8")
+            spaced_hyphens = ascii_name.replace("-", " ")
+            camel_split = re.sub(r"([a-z])([A-Z])", r"\1 \2", spaced_hyphens)
+            stripped = camel_split.replace(".", "").lower()
+            return "".join(stripped.split())
+
+        surname_key = normalize_name_for_comparison(surname)
+        first_name_key = normalize_name_for_comparison(first_name)
+
+        for pure_first, pure_last in pure_author_names:
+            pure_last_key = normalize_name_for_comparison(pure_last)
+            pure_first_key = normalize_name_for_comparison(pure_first)
+            if surname_key == pure_last_key and first_name_key == pure_first_key:
+                return pure_first, pure_last
+
+        first_name_without_middles = first_name.split()[0] if first_name else ""
+        return first_name_without_middles, surname
+
+    def compare_author_list_to_pure_db(
+        self,
+        affiliations_by_author_name: Dict[Tuple[str, str], List[str]],
+    ) -> Dict[Tuple[str, str], List[AffiliationResult]]:
+        """
+        Compare external (Scopus/Crossref) affiliations to PuRe data.
+
+        Colors encode status:
+        GREEN  = PuRe-based (fuzzy>=90 or fallback-to-PuRe)
+        GRAY   = publisher/external
+        PURPLE = MPI-Affiliation
+        RED    = no information, leave blank
         """
 
-        logger.debug(f'Entering compare_author_list_to_pure_db')
-        def process_affiliation(affiliation: str) -> str:
-            return affiliation.replace('  ', ', ').replace(') ', '), ')
+        external_to_pure_affiliation_cache: Dict[str, str] = {}
+        mpi_group_frequencies: Counter = Counter()
+        pending_mpi_indices_by_author: Dict[Tuple[str, str], List[int]] = {}
 
-        def handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations):
-            """Handle MPI affiliation processing."""
-            pubman_mpi_groups = [aff for aff in pubman_author_affiliations if is_mpi_affiliation(aff)]
-            if len(pubman_mpi_groups) == 1:
-                mpi_groups[pubman_mpi_groups[0]] += 1
-                return {
-                    'affiliation': pubman_mpi_groups[0],
-                    'color': 'yellow',
-                    'compare_error': 0,
-                    'comment': 'Found MPI match in database.'
-                }
-            elif len(pubman_mpi_groups) > 1:
-                ambiguous_mpi_affiliations[author] = pubman_mpi_groups
-                return {
-                    'affiliation': 'AMBIGUOUS MPI',
-                }
-            return {
-                'affiliation': 'MISSING MPI',
-            }
+        results_by_author: Dict[Tuple[str, str], List[AffiliationResult]] = {}
 
-        def handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations):
-            """Handle non-MPI affiliation using fuzzy matching."""
-            affiliation, score = process.extractOne(proposed_affiliation, pubman_author_affiliations)
-            compare_error = (100 - score) / 100
-            if score > 80:
-                return {
-                    'affiliation': affiliation,
-                    'color': 'green',
-                    'compare_error': compare_error,
-                    'comment': f'High confidence match from database. err={compare_error}'
-                }
-            return {
-                'affiliation': process_affiliation(proposed_affiliation),
-                'color': 'gray',
-                'compare_error': 0,
-                'comment': f'Author or similar affiliation not found in database -> using affiliation from publisher (err={compare_error}).'
-            }
-        mpi_groups = Counter()
-        processed_affiliations = {}
-        ambiguous_mpi_affiliations = {}
-        for (first_name, last_name), affiliations in affiliations_by_name.items():
-            author = self.compare_author_name_to_pure_db(self.affiliations_by_name_pubman.keys(), first_name, last_name)
-            processed_affiliations[author] = []
-            for proposed_affiliation in affiliations if affiliations else []:
-                pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
-                if pubman_author_affiliations:
-                    logger.debug(f"Proposed affiliation for {author}: {proposed_affiliation}, MPI check: {is_mpi_affiliation(proposed_affiliation)}")
+        for (first_name, last_name), proposed_affiliations in affiliations_by_author_name.items():
+            resolved_author: Tuple[str, str] = self.compare_author_name_to_pure_db(
+                self.affiliations_by_name_pubman.keys(), first_name, last_name
+            )
+            author_results: List[AffiliationResult] = []
+            pure_affiliations: List[str] = list(self.affiliations_by_name_pubman.get(resolved_author, {}).get("affiliations", []))
+            external_pure_affiliations: List[str] = [affiliation for affiliation in pure_affiliations if not is_mpi_affiliation(affiliation)]
 
+            for proposed_affiliation in proposed_affiliations:
+                if pure_affiliations:
                     if is_mpi_affiliation(proposed_affiliation):
-                        logger.debug(f"Handling MPI affiliation")
-                        affiliation_info = handle_mpi_affiliation(author, proposed_affiliation, pubman_author_affiliations)
+                        mpi_affiliations_for_author = [a for a in pure_affiliations if is_mpi_affiliation(a)]
+                        if len(mpi_affiliations_for_author) == 1:
+                            mpi_group = mpi_affiliations_for_author[0]
+                            author_results.append(AffiliationResult(affiliation=mpi_group, color=DecisionColor.PURPLE))
+                            mpi_group_frequencies[mpi_group] += 1
+                        else:
+                            author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
+                            pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
                     else:
-                        logger.debug(f"Handling non-MPI affiliation")
-                        affiliation_info = handle_non_mpi_affiliation(proposed_affiliation, pubman_author_affiliations)
-                elif proposed_affiliation.strip():
-                    logger.debug(f"No PuRe affiliation for {author}, but provided: {proposed_affiliation}")
+                        if proposed_affiliation in external_to_pure_affiliation_cache:
+                            mapped = external_to_pure_affiliation_cache[proposed_affiliation]
+                            author_results.append(AffiliationResult(affiliation=mapped, color=DecisionColor.GREEN))
+                        else:
+                            best_match, compare_error = find_best_fuzzy_match(proposed_affiliation, external_pure_affiliations)
+                            if best_match:
+                                external_to_pure_affiliation_cache[proposed_affiliation] = best_match
+                                author_results.append(
+                                    AffiliationResult(affiliation=best_match, color=DecisionColor.GREEN, compare_error=compare_error)
+                                )
+                            else:
+                                author_results.append(
+                                    AffiliationResult(affiliation=normalize_affiliation(proposed_affiliation), color=DecisionColor.GRAY)
+                                )
+                else:
                     if is_mpi_affiliation(proposed_affiliation):
-                        affiliation_info = {
-                            'affiliation': 'MISSING MPI',
-                        }
+                        author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
+                        pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
                     else:
-                        affiliation_info = {
-                            'affiliation': process_affiliation(proposed_affiliation),
-                            'color': 'gray',
-                            'compare_error': 0,
-                            'comment': 'No PuRe affiliation for author, adopting external affiliation.'
-                        }
+                        author_results.append(
+                            AffiliationResult(affiliation=normalize_affiliation(proposed_affiliation), color=DecisionColor.GRAY)
+                        )
+
+            if not author_results:
+                if pure_affiliations:
+                    author_results.append(AffiliationResult(affiliation=pure_affiliations[0], color=DecisionColor.GREEN))
                 else:
-                    affiliation_info = {
-                        'affiliation': process_affiliation(proposed_affiliation),
-                        'color': 'darkred',
-                        'compare_error': 0,
-                        'comment': f'Affiliation for {author} not found in PuRe or Scopus/Crossref'
-                    }
-                processed_affiliations[author].append(affiliation_info)
+                    author_results.append(AffiliationResult(affiliation="", color=DecisionColor.RED))
 
-                if is_mpi_affiliation(affiliation_info['affiliation']):
-                    mpi_groups[affiliation_info['affiliation']] += 1
+            results_by_author[resolved_author] = author_results
 
-        logger.debug(f"MPI groups: {mpi_groups}")
-        most_common_mpi_group = mpi_groups.most_common(1)[0][0] if mpi_groups else self.mpi_affiliations[0]
-        logger.debug(f"Most common MPI group: {most_common_mpi_group}")
+        most_common_mpi_group: str = (
+            mpi_group_frequencies.most_common(1)[0][0] if mpi_group_frequencies else self.mpi_affiliations[0]
+        )
 
-        # Resolve ambiguous MPI affiliations and assign missing MPI groups
-        for author, affiliations in processed_affiliations.items():
-            logger.debug(f'Postprocessing author {author}')
-            if not affiliations:
-                pubman_author_affiliations = self.affiliations_by_name_pubman.get(author, {}).get('affiliations', [])
-                if pubman_author_affiliations:
-                    logger.debug(f'No external affiliations found, using PuRe instead: {pubman_author_affiliations}')
-                    processed_affiliations[author].append({
-                        'affiliation': list(pubman_author_affiliations)[0],
-                        'color': 'red',
-                        'compare_error': 0,
-                        'comment': 'No external affiliations found, using PuRe instead'
-                    })
-                else:
-                    logger.debug(f'No external affiliations or PuRe affiliations found, leaving empty')
-                    processed_affiliations[author].append({
-                        'affiliation': '',
-                        'color': 'red',
-                        'compare_error': 0,
-                        'comment': 'No external affiliations or PuRe affiliations found, leaving empty'
-                    })
-            else:
-                for i, affiliation_info in enumerate(affiliations):
-                    affiliation = affiliation_info['affiliation']
-                    logger.debug(f"Author: {author}, Current affiliation: {affiliation}")
-                    if affiliation == 'AMBIGUOUS MPI':
-                        logger.debug(f"Resolving ambiguous MPI affiliation for {author}. Groups: {ambiguous_mpi_affiliations[author]}")
-                        similar_affiliation, score = process.extractOne(most_common_mpi_group, ambiguous_mpi_affiliations[author])
-                        compare_error = (100 - score) / 100
-                        processed_affiliations[author][i] = {
-                            'affiliation': similar_affiliation,
-                            'color': 'yellow' if score > 95 else 'red',
-                            'compare_error': compare_error,
-                            'comment': f'Resolved ambiguous MPI affiliation using most common group. err={compare_error}'
-                        }
-                    elif affiliation == 'MISSING MPI':
-                        processed_affiliations[author][i] = {
-                            'affiliation': most_common_mpi_group,
-                            'color': 'yellow',
-                            'compare_error': 0,
-                            'comment': 'Assigned most common MPI group due to missing MPI affiliation.'
-                        }
+        for author_key, indices in pending_mpi_indices_by_author.items():
+            for idx in indices:
+                results_by_author[author_key][idx].affiliation = most_common_mpi_group  # dataclass is mutable
 
-        return processed_affiliations
+        return results_by_author
 
     def download_pdf(self, pdf_link, doi, retries=3):
         """
@@ -309,6 +291,9 @@ class DOIParser:
 
         if not results:
             return None
+        for doi in results:
+            if results[doi].get('Field'):
+                results[doi]['Field'] = '\n'.join(results[doi]['Field'])
         df = pd.DataFrame.from_dict(results, orient='index').reset_index()
         df.rename(columns={'index': 'DOI'}, inplace=True)
         return df
@@ -330,7 +315,7 @@ class DOIParser:
         """
         table_overview = []
         for index, row in dois_data.iterrows():
-            if not pd.isna(row['Field']) and row['Field'] not in (None, '', 0, False) and not force:
+            if row['Field'] and not force:
                 logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
                 continue
 
@@ -357,7 +342,6 @@ class DOIParser:
                     skip = True
                     break
             if skip:
-
                 continue
 
             link = crossref_metadata.get('resource', {}).get('primary', {}).get('URL', '')
@@ -444,14 +428,13 @@ class DOIParser:
             if not page and not article_number and not is_older_than_six_months(date_issued):
                 logger.info(f'Skipping {row["DOI"]}, no page or article number specified and newer than 6 months, probably still a preprint')
                 continue
-
             cleaned_author_list = self.compare_author_list_to_pure_db(affiliations_by_name)
-            has_institute_publication = False
+            is_mpi_publication = False
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
                 for affiliation_info in affiliations_info:
-                    if any([name in affiliation_info['affiliation'].lower() for name in ['max-planck','max planck','maxplanck']]):
-                        has_institute_publication = True
-            if not has_institute_publication:
+                    if is_mpi_affiliation(affiliation_info.affiliation):
+                        is_mpi_publication = True
+            if not is_mpi_publication:
                 logger.error('Publication has no author from Max Planck Institute, skipping...')
                 continue
 
@@ -462,8 +445,8 @@ class DOIParser:
                 "Publisher": Cell(html.unescape(unidecode(crossref_metadata.get('publisher', None)) or ''), 20),
                 "Issue": Cell(crossref_metadata.get('issue', None), 10),
                 "Volume": Cell(crossref_metadata.get('volume', None), 10),
-                "Page": Cell(page, 10, color='red' if not article_number and not page else ''),
-                'Article Number': Cell(article_number, 10, color='red' if not article_number and not page else '', force_text=True),
+                "Page": Cell(page, 10, color='RED' if not article_number and not page else ''),
+                'Article Number': Cell(article_number, 10, color='RED' if not article_number and not page else '', force_text=True),
                 "ISSN": Cell(html.unescape(unidecode(crossref_metadata.get('ISSN', [None])[0] or '')), 15),
                 "Date published online": Cell(date_to_cell(crossref_metadata.get('created', {}).get('date-time', None)), 20, force_text=True),
                 'Date issued': Cell(date_issued, 20, force_text=True),
@@ -471,7 +454,7 @@ class DOIParser:
                 'License url': Cell(license_url if license_type=='open' else '', 20),
                 'License year': Cell(license_year if license_type=='open' else '', 15),
                 'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15,
-                                  color='red' if missing_pdf else '',
+                                  color='RED' if missing_pdf else '',
                                   comment = 'Please upload the file and license info when submitting in PuRe'
                                   if missing_pdf else ''),
                 'Crossref Link': Cell(link, 20),
@@ -481,10 +464,10 @@ class DOIParser:
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
                 for affiliation_info in affiliations_info:
                     prefill_publication[f"Author {i}"] = Cell(first_name + ' ' + last_name)
-                    prefill_publication[f"Affiliation {i}"] = Cell(affiliation_info['affiliation'],
-                                                                   color = affiliation_info['color'],
-                                                                   compare_error = affiliation_info['compare_error'],
-                                                                   comment = affiliation_info['comment'])
+                    prefill_publication[f"Affiliation {i}"] = Cell(affiliation_info.affiliation,
+                                                                   color = affiliation_info.color.name,
+                                                                   compare_error = affiliation_info.compare_error,
+                                                                   comment = affiliation_info.comment)
                     i = i+1
             table_overview.append(prefill_publication)
         return table_overview

@@ -81,14 +81,10 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
     })
 
     colors = {
-        'darkred': '#8B0000',
-        'gray': '#d3d3d3',
-        'yellow': '#ffffe0',
-        'orange': '#ffd8b1',
-        'red': '#ff9999',
-        'purple': '#e6e6fa',
-        'pink': '#FFEEEE',
-        'green': '#ccffcc'
+        'GRAY': '#d3d3d3',
+        'RED': '#ff9999',
+        'PURPLE': '#e6e6fa',
+        'GREEN': '#ccffcc'
     }
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}
