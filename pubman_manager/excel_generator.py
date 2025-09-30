@@ -2,6 +2,8 @@ import xlsxwriter
 from collections import OrderedDict, Counter
 import pandas as pd
 
+from typing import *
+
 class Cell:
     def __init__(self, data, width=None, color='', comment='', compare_error=None, force_text=False):
         self.data = '' if not data or pd.isna(data) else data
@@ -17,9 +19,15 @@ class Cell:
     def __repr__(self):
         return str(self)
 
-
-
-def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_authors, prefill_publications=None, n_entries=None, save=True):
+def create_sheet(
+    file_path: str,
+    affiliations_by_name_pubman: Dict[Tuple[str, str], List[str]],
+    column_details: OrderedDict[str, str],
+    n_authors: int,
+    prefill_publications: Dict[str, Cell] = None,
+    n_entries: int = None,
+    example_row: List[str] = None,
+):
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided to determine the number of rows.")
 
@@ -104,10 +112,13 @@ def create_sheet(file_path, affiliations_by_name_pubman, column_details, n_autho
 
     for col_index, (header, (width, comment)) in enumerate(col_layout.items()):
         main_sheet.write(start_row, col_index, header, header_format)
-        main_sheet.write(start_row + 1, col_index, 'Example' if header == 'Entry Number' else '', italic_format)
+        if header == 'Entry Number' and example_row is not None:
+            main_sheet.write(start_row + 1, col_index, 'Example', italic_format)
+            for i, col_entry in enumerate(example_row):
+                main_sheet.write(start_row + 1, col_index + 1 + i, col_entry, italic_format)
         main_sheet.set_column(col_index, col_index, width)
 
-    start_row = start_row + len(disclaimer_lines) - 1
+    start_row = start_row + len(disclaimer_lines)
     names_sheet.write('A1', 'Names')
     names_sheet.write('B1', 'Affiliations')
     for row_index, (first_name, last_name) in enumerate(names, start=1):
