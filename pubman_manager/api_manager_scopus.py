@@ -230,6 +230,9 @@ class ScopusManager:
 
         # Authors listing (order preserved)
         authors_block = abstracts.get('authors', {})
+        if not authors_block:
+            logger.warning(f'No author info in Scopus: {scopus_metadata}')
+            return {}
         authors = _as_list(authors_block.get('author'))
 
         for a in authors:
@@ -261,6 +264,7 @@ class ScopusManager:
             author_affiliation_map[(first, last)] = unique_affs
 
         return author_affiliation_map
+
     def get_author_id(self, first_name: str, last_name: str) -> str:
         """
         Retrieve the Scopus Author ID for the specified author.

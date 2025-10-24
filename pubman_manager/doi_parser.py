@@ -33,6 +33,7 @@ class DecisionColor(Enum):
         return obj
 
     GREEN   = "PuRe match"                     # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
+    ORANGE   = "No info from external APIs, adopting frequent PuRe result" # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
     GRAY    = "Using publisher affiliation"    # external/publisher adopted
     PURPLE  = "MPI affiliation detected"       # any MPI case (match/ambiguous/missing/resolved)
     RED = "No affiliation information"     # nothing available
@@ -114,7 +115,8 @@ class DOIParser:
         Compare external (Scopus/Crossref) affiliations to PuRe data.
 
         Colors encode status:
-        GREEN  = PuRe-based (fuzzy>=90 or fallback-to-PuRe)
+        GREEN  = PuRe-based (fuzzy>=90)
+        ORANGE  = Adopt PuRe when no Info was given
         GRAY   = publisher/external
         PURPLE = MPI-Affiliation
         RED    = no information, leave blank
@@ -123,55 +125,60 @@ class DOIParser:
         external_to_pure_affiliation_cache: Dict[str, str] = {}
         mpi_group_frequencies: Counter = Counter()
         pending_mpi_indices_by_author: Dict[Tuple[str, str], List[int]] = {}
+        mpi_affiliations_by_author: Dict[Tuple[str, str], List[str]] = {}
 
         results_by_author: Dict[Tuple[str, str], List[AffiliationResult]] = {}
 
-        for (first_name, last_name), proposed_affiliations in affiliations_by_author_name.items():
+        for (first_name, last_name), journal_affiliations in affiliations_by_author_name.items():
             resolved_author: Tuple[str, str] = self.compare_author_name_to_pure_db(
                 self.affiliations_by_name_pubman.keys(), first_name, last_name
             )
             author_results: List[AffiliationResult] = []
             pure_affiliations: List[str] = list(self.affiliations_by_name_pubman.get(resolved_author, {}).get("affiliations", []))
-            external_pure_affiliations: List[str] = [affiliation for affiliation in pure_affiliations if not is_mpi_affiliation(affiliation)]
 
-            for proposed_affiliation in proposed_affiliations:
+            for journal_affiliation in journal_affiliations:
                 if pure_affiliations:
-                    if is_mpi_affiliation(proposed_affiliation):
+                    if is_mpi_affiliation(journal_affiliation):
                         mpi_affiliations_for_author = [a for a in pure_affiliations if is_mpi_affiliation(a)]
+                        for mpi_group in mpi_affiliations_for_author:
+                            mpi_group_frequencies[mpi_group] += 1
                         if len(mpi_affiliations_for_author) == 1:
                             mpi_group = mpi_affiliations_for_author[0]
                             author_results.append(AffiliationResult(affiliation=mpi_group, color=DecisionColor.PURPLE))
-                            mpi_group_frequencies[mpi_group] += 1
                         else:
+                            # Assume authors can only have one mpi affiliation at a time
                             author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
+                            mpi_affiliations_by_author[resolved_author] = mpi_affiliations_for_author
                             pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
                     else:
-                        if proposed_affiliation in external_to_pure_affiliation_cache:
-                            mapped = external_to_pure_affiliation_cache[proposed_affiliation]
+                        if journal_affiliation in external_to_pure_affiliation_cache:
+                            mapped = external_to_pure_affiliation_cache[journal_affiliation]
                             author_results.append(AffiliationResult(affiliation=mapped, color=DecisionColor.GREEN))
                         else:
-                            best_match, compare_error = find_best_fuzzy_match(proposed_affiliation, external_pure_affiliations)
+                            external_pure_affiliations: List[str] = [affiliation for affiliation in pure_affiliations if not is_mpi_affiliation(affiliation)]
+                            best_match, compare_error = find_best_fuzzy_match(journal_affiliation, external_pure_affiliations)
                             if best_match:
-                                external_to_pure_affiliation_cache[proposed_affiliation] = best_match
+                                external_to_pure_affiliation_cache[journal_affiliation] = best_match
                                 author_results.append(
                                     AffiliationResult(affiliation=best_match, color=DecisionColor.GREEN, compare_error=compare_error)
                                 )
                             else:
                                 author_results.append(
-                                    AffiliationResult(affiliation=normalize_affiliation(proposed_affiliation), color=DecisionColor.GRAY)
+                                    AffiliationResult(affiliation=normalize_affiliation(journal_affiliation), color=DecisionColor.GRAY)
                                 )
                 else:
-                    if is_mpi_affiliation(proposed_affiliation):
+                    if is_mpi_affiliation(journal_affiliation):
                         author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
                         pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
                     else:
                         author_results.append(
-                            AffiliationResult(affiliation=normalize_affiliation(proposed_affiliation), color=DecisionColor.GRAY)
+                            AffiliationResult(affiliation=normalize_affiliation(journal_affiliation), color=DecisionColor.GRAY)
                         )
 
             if not author_results:
                 if pure_affiliations:
-                    author_results.append(AffiliationResult(affiliation=pure_affiliations[0], color=DecisionColor.GREEN))
+                    author_results.append(AffiliationResult(affiliation=pure_affiliations[0],
+                                                            color=DecisionColor.PURPLE if is_mpi_affiliation(pure_affiliations[0]) else DecisionColor.ORANGE))
                 else:
                     author_results.append(AffiliationResult(affiliation="", color=DecisionColor.RED))
 
@@ -181,9 +188,18 @@ class DOIParser:
             mpi_group_frequencies.most_common(1)[0][0] if mpi_group_frequencies else self.mpi_affiliations[0]
         )
 
-        for author_key, indices in pending_mpi_indices_by_author.items():
+        for resolved_author, indices in pending_mpi_indices_by_author.items():
+            allowed = mpi_affiliations_by_author.get(resolved_author, [])
+            pick = None
+            if allowed:
+                allowed_set = set(allowed)
+                for grp, _cnt in mpi_group_frequencies.most_common():
+                    if grp in allowed_set:
+                        pick = grp
+                        break
+            pick = most_common_mpi_group
             for idx in indices:
-                results_by_author[author_key][idx].affiliation = most_common_mpi_group  # dataclass is mutable
+                results_by_author[resolved_author][idx].affiliation = pick  # dataclass is mutable
 
         return results_by_author
 
@@ -248,6 +264,9 @@ class DOIParser:
                     logger.info(f'Found Title match in Database, ignoring new entry')
                 else:
                     pub = pub_first_half if pub_first_half else pub_latter_half
+        elif pub:
+            if pub[0]['data']['versionState'] == 'PENDING': # Only consider submitted items
+                return False
         return bool(pub)
 
     def get_dois_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> List[str]:
@@ -261,25 +280,27 @@ class DOIParser:
         processed_dois = set(processed_dois) if processed_dois else set()
         dois = set(dois)
         dois_to_process = list(dois - processed_dois)
-        dois_to_skip = list(dois & processed_dois)
 
         for doi in dois_to_process:
             if self.has_pubman_entry(doi):
                 logger.info(f'Found Publication for {doi} in PuRe, skipping...')
-                dois_to_skip.append(doi)
+                processed_dois.add(doi)
 
-        if dois_to_skip:
-            logger.info(f'Skipping already processed dois: {len(dois_to_skip)}')
-
+        if processed_dois:
+            logger.info(f'Skipping already processed dois: {len(processed_dois)}')
         results = {}
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
-                    for doi in [d for d in dois_to_process if d in dois_crossref and d not in dois_to_skip]}
-            for future in as_completed(futures):
-                doi = futures[future]
-                crossref_result = future.result()
-                results[doi] = crossref_result
-        for doi in [doi for doi in dois_to_process if not doi in dois_to_skip]:
+        for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
+            crossref_result = self.crossref_manager.get_overview(doi)
+            results[doi] = crossref_result
+        # with ThreadPoolExecutor(max_workers=2) as executor:
+        #     futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
+        #             for doi in [d for d in dois_to_process if d in dois_crossref and d not in dois_to_skip]}
+        #     for future in as_completed(futures):
+        #         doi = futures[future]
+        #         crossref_result = future.result()
+        #         print("crossref_result",crossref_result)
+        #         results[doi] = crossref_result
+        for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             scopus_result = self.scopus_manager.get_overview(doi)
             if scopus_result:
                 if doi not in results:
@@ -288,7 +309,6 @@ class DOIParser:
                     results[doi]['scopus'] = scopus_result['scopus']
                     if scopus_result.get('Field'):
                         results[doi]['Field'] = results[doi].get('Field', []) + scopus_result['Field']
-
         if not results:
             return None
         for doi in results:
@@ -384,7 +404,6 @@ class DOIParser:
                 date_issued = (f"{date_issued_crossref[0][2]}." if len(date_issued_crossref[0])==3 else "") + \
                               (f"{date_issued_crossref[0][1]}." if len(date_issued_crossref[0])>=2 else "") + \
                               (f"{date_issued_crossref[0][0]}")
-
 
             from datetime import date
             from calendar import monthrange

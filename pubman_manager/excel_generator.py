@@ -92,7 +92,8 @@ def create_sheet(
         'GRAY': '#d3d3d3',
         'RED': '#ff9999',
         'PURPLE': '#e6e6fa',
-        'GREEN': '#ccffcc'
+        'GREEN': '#ccffcc',
+        'ORANGE': 'orange',
     }
 
     cell_color_formats = {color: workbook.add_format({'bg_color': colors[color], 'text_wrap': True}) for color in colors.keys()}

@@ -28,21 +28,33 @@ class PubmanCreator(PubmanBase):
             self.journals = yaml.load(f, Loader=yaml.FullLoader)
 
     def parse_excel_table(self, file_path):
-        def find_header_row(df):
-            for i in range(len(df)):
-                if not pd.isna(df.iloc[i, 1]) and str(df.iloc[i, 1]).strip() != 'Title':
-                    return i - 2
-        def find_end_row(df, start_row):
-            for i in range(start_row, len(df)):
-                if pd.isna(df.iloc[i, 1]) or df.iloc[i, 1].strip() == '':
-                    return i - 1
-            return len(df) - 1
-        df_full = pd.read_excel(file_path, engine='openpyxl', header=None)
-        header_row = find_header_row(df_full)
-        start_row = header_row + 2
-        end_row = find_end_row(df_full, start_row)
-        df_data = pd.read_excel(file_path, engine='openpyxl', header=header_row, dtype=str)
-        df = df_data.iloc[start_row - header_row - 1:end_row - header_row]
+        raw = pd.read_excel(file_path, engine='openpyxl', header=None)
+        colB = raw.iloc[:, 1].astype(str).str.strip().str.casefold()
+        hits = colB.eq("title")
+        if not hits.any():
+            raise ValueError("Couldn't find header row: column B must contain 'Title'.")
+        header_row = hits.idxmax()
+        header = raw.iloc[header_row].astype(str).str.strip().replace("nan", "")
+        cols = []
+        seen = {}
+        for i, c in enumerate(header):
+            c = c if c else f"Unnamed_{i}"
+            if c in seen:
+                seen[c] += 1
+                c = f"{c}_{seen[c]}"
+            else:
+                seen[c] = 0
+            cols.append(c)
+        start = header_row + 1
+        end = raw.shape[0]
+        for r in range(start, end):
+            row = raw.iloc[r]
+            if row.isna().all() or pd.isna(row.iloc[1]) or str(row.iloc[1]).strip() == "":
+                end = r
+                break
+        df = raw.iloc[start:end].copy()
+        df.columns = cols
+        df.reset_index(drop=True, inplace=True)
         return df
 
     def get_row_authors_info(self, row):
@@ -237,31 +249,66 @@ class PubmanCreator(PubmanBase):
         family_name = " ".join(family_name_parts)
         return given_name, family_name
 
+    def get_journal_by_issn(self, issn: str) -> dict | None:
+        """Try to collect journal data from pubman if there is no direct match in cached instutite publications"""
+        query = {
+            "query": {
+                "nested": {
+                    "path": "metadata.sources.identifiers",
+                    "query": {
+                        "bool": {
+                            "must": [
+                                {"match_phrase": {"metadata.sources.identifiers.type": "ISSN"}}
+                            ],
+                            "should": [
+                                {"match_phrase": {"metadata.sources.identifiers.id": issn}},
+                            ],
+                            "minimum_should_match": 1,
+                        }
+                    }
+                }
+            },
+            "size": 25,
+        }
 
-    def get_best_journal_match(self, journal_title):
-        matches = process.extract(
-            journal_title,
-            self.journals.keys(),
-            scorer=fuzz.ratio,
-            score_cutoff=97
-        )
-        cone_matches = []
-        for match, score, key in matches:
-            journal_entry = self.journals.get(match, {})
-            if journal_entry.get('identifiers', {}).get('CONE'):
-                cone_matches.append((match, score))
-        if cone_matches:
-            logger.info(f'Found CONE match in pubman for {journal_title}')
-            best_match = max(cone_matches, key=lambda x: x[1])[0]
-        elif matches:
-            logger.info(f'Found non-CONE match in pubman for {journal_title}')
-            best_match = max(matches, key=lambda x: x[1])[0]
-        else:
-            logger.info(f'Found no match in pubman for {journal_title}')
-            best_match = journal_title
-        return best_match
+        headers = {
+            "Authorization": self.auth_token,
+            "Content-Type": "application/json",
+        }
+        resp = requests.post(f"{self.base_url}/items/search", headers=headers, data=json.dumps(query))
+        if resp.status_code != 200:
+            raise Exception(f"Journal lookup failed: {resp.status_code} {resp.text}")
 
-    def create_publications(self, file_path, create_items=True, submit_items=True, overwrite=False):
+        records = resp.json().get("records", []) or []
+
+        def pick_source(sources: list[dict]) -> dict | None:
+            matches = []
+            for s in sources or []:
+                ids = {i.get("type", "").upper(): i.get("id") for i in s.get("identifiers", [])}
+                issn_val = ids.get("ISSN")
+                if not issn_val:
+                    continue
+                has_cone = "CONE" in ids
+                matches.append((has_cone, s, ids))
+            if not matches:
+                return None
+            matches.sort(key=lambda t: (not t[0]))
+            _, source, ids = matches[0]
+            return {
+                "title": source.get("title"),
+                "alternativeTitles": source.get("alternativeTitles", []),
+                "genre": source.get("genre"),
+                "publishingInfo": source.get("publishingInfo"),
+                "cone": ids.get("CONE"),
+            }
+        for rec in records:
+            srcs = rec.get("data", {}).get("metadata", {}).get("sources", [])
+            best = pick_source(srcs)
+            if best:
+                return best
+        return None
+
+    def create_publications(self, file_path, submit_items=False, overwrite=False):
         df = self.parse_excel_table(file_path)
         request_list = []
 
@@ -308,20 +355,25 @@ class PubmanCreator(PubmanBase):
             date_published_parsed = self.safe_date_parse(str(date_published_sheet)) if date_published_sheet else None
             date_published_online = self.format_date(date_published_parsed, date_published_sheet) if date_published_parsed else None
 
-            journalname_in_pubman = self.get_best_journal_match(row.get('Journal Title', ''))
-            identifiers = self.journals.get(journalname_in_pubman, {}).get('identifiers', {})
-            identifiers['ISSN'] = self.clean_scalar(row.get('ISSN'))
-            identifiers_list = [{'type': key, 'id': id} for key, id in
-                                identifiers.items()]
+            journal_title = row['Journal Title']
+            if self.journals.get(row['ISSN']):
+                journal_info = self.journals.get(row['ISSN'])
+            else:
+                logger.info(f'No existing entry for journal "{journal_title}" ({row["ISSN"]}) found for current institute, looking globally...')
+                journal_info = self.get_journal_by_issn(row['ISSN'])
+                if not journal_info:
+                    logger.warning(f'No CoNe entry found for journal {journal_title} ({row["ISSN"]})')
+                    journal_info = {}
 
             sources = [{
-                'alternativeTitles': self.journals.get(journalname_in_pubman, {}).get('alternativeTitles', []),
-                "genre": self.journals.get(journalname_in_pubman, {}).get('genre', 'JOURNAL'),
-                "title": journalname_in_pubman,
-                "publishingInfo": self.journals.get(journalname_in_pubman, {}).get('publishingInfo', {'publisher': row.get('Publisher')}),
+                'alternativeTitles': journal_info.get('alternativeTitles', []),
+                "genre": journal_info.get('genre', 'JOURNAL'),
+                "title": journal_title,
+                "publishingInfo": journal_info.get('publishingInfo', {'publisher': row.get('Publisher')}),
                 "volume": self.clean_scalar(row.get('Volume')),
                 "issue": self.clean_scalar(row.get('Issue')),
-                "identifiers": identifiers_list,
+                "identifiers": [{'type': 'ISSN', 'id': row['ISSN']},
+                                {'type': 'CONE', 'id': journal_info.get('cone')}],
             }]
             if page:=self.clean_scalar(row['Page']):
                 sources[0]['startPage'] = page.split('-')[0].strip()
@@ -417,10 +469,10 @@ class PubmanCreator(PubmanBase):
                     "metadata.identifiers.id": doi,
                 }, request)
             )
-        if create_items:
-            self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
+        self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
 
     def create_items(self, request_list, create_items = True, submit_items=False, overwrite=False):
+        quit()
         item_ids = []
         for criteria, request_json in request_list:
             created_item = None
