@@ -1,4 +1,5 @@
 from fuzzywuzzy import process as fuzz
+
 from unidecode import unidecode
 from bs4 import BeautifulSoup
 from pathlib import Path
@@ -110,6 +111,7 @@ class DOIParser:
     def compare_author_list_to_pure_db(
         self,
         affiliations_by_author_name: Dict[Tuple[str, str], List[str]],
+        fuzz_threshold: int = 97, # percentile value
     ) -> Dict[Tuple[str, str], List[AffiliationResult]]:
         """
         Compare external (Scopus/Crossref) affiliations to PuRe data.
@@ -122,6 +124,7 @@ class DOIParser:
         RED    = no information, leave blank
         """
 
+        print("affiliations_by_author_name", affiliations_by_author_name)
         external_to_pure_affiliation_cache: Dict[str, str] = {}
         mpi_group_frequencies: Counter = Counter()
         pending_mpi_indices_by_author: Dict[Tuple[str, str], List[int]] = {}
@@ -197,10 +200,27 @@ class DOIParser:
                     if grp in allowed_set:
                         pick = grp
                         break
-            pick = most_common_mpi_group
+            if pick is None:
+                pick = most_common_mpi_group
             for idx in indices:
                 results_by_author[resolved_author][idx].affiliation = pick  # dataclass is mutable
 
+        # Assume that very similar affiliations overlap (see fuzz_threshold)
+        canon: list[str] = []
+        for _author, res_list in results_by_author.items():
+            for res in res_list:
+                s = (res.affiliation or "").strip()
+                if not s:
+                    continue
+                if not canon:
+                    canon.append(s)
+                    continue
+                match = fuzz.extractOne(s, canon, scorer=fuzz.token_set_ratio)
+                if match and match[1] >= fuzz_threshold:
+                    res.affiliation = match[0]
+                else:
+                    canon.append(s)
+        print("results_by_author", results_by_author)
         return results_by_author
 
     def download_pdf(self, pdf_link, doi, retries=3):
@@ -216,7 +236,7 @@ class DOIParser:
         Returns:
             bool: True if the PDF was successfully downloaded, False otherwise.
         """
-        pdf_path = FILES_DIR / f'{doi.replace("/", "_")}.pdf'
+        pdf_path = FILES_DIR / f'{doi.replace("/", "")}.pdf'
         if pdf_path.exists():
             logger.debug(f'Pdf path {pdf_path} already exists, skipping...')
             return True
@@ -291,6 +311,7 @@ class DOIParser:
         results = {}
         for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             crossref_result = self.crossref_manager.get_overview(doi)
+            print("crossref_result", crossref_result)
             results[doi] = crossref_result
         # with ThreadPoolExecutor(max_workers=2) as executor:
         #     futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
@@ -302,6 +323,8 @@ class DOIParser:
         #         results[doi] = crossref_result
         for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             scopus_result = self.scopus_manager.get_overview(doi)
+            print("scopus_result", scopus_result)
+
             if scopus_result:
                 if doi not in results:
                     results[doi] = scopus_result
@@ -505,6 +528,6 @@ class DOIParser:
                 if 'Author ' not in header and 'Affiliation ' not in header
             })
             create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
-                        column_details, n_authors,
+                        column_details, n_authors,'Title',
                         prefill_publications = dois_data)
             logger.info(f"Saved {path_out} successfully.")
