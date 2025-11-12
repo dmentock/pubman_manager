@@ -4,7 +4,7 @@ from dateutil.parser import ParserError
 from rapidfuzz import process, fuzz
 
 from dateutil import parser
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import yaml
 from pathlib import Path
 import requests
@@ -27,81 +27,156 @@ class PubmanCreator(PubmanBase):
         with open(PUBMAN_CACHE_DIR / 'journals.yaml', 'r') as f:
             self.journals = yaml.load(f, Loader=yaml.FullLoader)
 
-    def parse_excel_table(self, file_path):
-        raw = pd.read_excel(file_path, engine='openpyxl', header=None)
-        colB = raw.iloc[:, 1].astype(str).str.strip().str.casefold()
-        hits = colB.eq("title")
-        if not hits.any():
-            raise ValueError("Couldn't find header row: column B must contain 'Title'.")
-        header_row = hits.idxmax()
-        header = raw.iloc[header_row].astype(str).str.strip().replace("nan", "")
+    def parse_excel_table(self, file_path, header_name):
+        """
+        Parse a worksheet that has a header row containing a cell 'Title' and
+        arbitrary spacer rows below. Return all rows beneath the header where
+        the Title column is non-empty.
+
+        Parameters
+        ----------
+        file_path : str or pathlib.Path
+            Path to the Excel file.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Cleaned table with de-duplicated column names, filtered to rows with
+            a non-empty Title cell, and index reset.
+        """
+        # Read everything as strings so we can trim/clean uniformly
+        raw = pd.read_excel(file_path, engine="openpyxl", header=None, dtype=str)
+        # Normalize whitespace for matching
+        colA = raw.iloc[:, 0].astype(str).str.strip().str.casefold()
+
+        # 1) Find header row: prefer Column A == "title"
+        hits = colA.eq(header_name.lower())
+        if hits.any():
+            header_row = hits.idxmax()
+        else:
+            # Fallback: search any column for a cell == "title" (case-insensitive)
+            any_hits = raw.apply(lambda s: s.astype(str).str.strip().str.casefold().eq(header_name.lower()))
+            row_hits = any_hits.any(axis=1)
+            if not row_hits.any():
+                raise ValueError(f"Couldn't find header row: a cell with {header_name} was not found.")
+            header_row = row_hits.idxmax()
+
+        # 2) Build column names from the header row, de-duplicated
+        header = raw.iloc[header_row].fillna("").astype(str).str.strip()
+        header = header.replace({"nan": ""})  # literal "nan" strings
         cols = []
         seen = {}
-        for i, c in enumerate(header):
-            c = c if c else f"Unnamed_{i}"
-            if c in seen:
-                seen[c] += 1
-                c = f"{c}_{seen[c]}"
+        for i, c in enumerate(header.tolist()):
+            name = c if c else f"Unnamed_{i}"
+            if name in seen:
+                seen[name] += 1
+                name = f"{name}_{seen[name]}"
             else:
-                seen[c] = 0
-            cols.append(c)
-        start = header_row + 1
-        end = raw.shape[0]
-        for r in range(start, end):
-            row = raw.iloc[r]
-            if row.isna().all() or pd.isna(row.iloc[1]) or str(row.iloc[1]).strip() == "":
-                end = r
-                break
-        df = raw.iloc[start:end].copy()
-        df.columns = cols
-        df.reset_index(drop=True, inplace=True)
-        return df
+                seen[name] = 0
+            cols.append(name)
+
+        # 3) Take all rows beneath the header; align to the header width
+        data = raw.iloc[header_row + 1 :, : len(cols)].copy()
+        data.columns = cols
+
+        # 4) Clean cells to uniform strings, remove obvious "empty" markers
+        def _clean_cell(x):
+            if x is None:
+                return ""
+            s = str(x).strip()
+            if s.lower() in {"nan", "none"}:
+                return ""
+            return s
+        data = data.applymap(_clean_cell)
+
+        # 5) Identify the Title column (case-insensitive, allows suffixes from dedupe)
+        title_col = next(
+            (c for c in data.columns if c.strip().casefold() == "title"),
+            None
+        )
+        if title_col is None:
+            # If the deduper produced e.g. "Title_1", pick the first that starts with "Title"
+            candidates = [c for c in data.columns if c.split("_", 1)[0].strip().casefold() == "title"]
+            if candidates:
+                title_col = candidates[0]
+            else:
+                # Last resort: assume first column is Title
+                title_col = data.columns[0]
+
+        # 6) Keep only rows with a non-empty Title; drop fully empty rows
+        mask_title = data[title_col].astype(str).str.strip() != ""
+        # Drop rows entirely empty across all columns (after cleaning)
+        non_empty_row = ~(data.eq("").all(axis=1))
+        data = data[mask_title & non_empty_row].reset_index(drop=True)
+
+        return data
 
     def get_row_authors_info(self, row):
+        # escape excel carriage return char
+        xnnnn_re = re.compile(r"_x([0-9A-Fa-f]{4})_")
+        # normalize whitespace (turn CR/LF etc. into single spaces)
+
         row_authors = OrderedDict()
         authors_info_merged_names = {f'{first_name} {last_name}': affiliations for (first_name, last_name), affiliations in self.authors_info.items()}
         for i in range(1, 50):  # TODO: make scalable
             author_name_key = f'Author {i}'
             affiliation_key = f'Affiliation {i}'
             if author_name_key in row and affiliation_key in row:
+                print("author_name_key",author_name_key)
                 if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                    if row[author_name_key] not in row_authors:
-                        if identifier:=authors_info_merged_names.get(row[author_name_key],{}).get('identifier'):
-                            row_authors[row[author_name_key]] = {'identifier': identifier}
+                    print("nota")
+                    if row.get(author_name_key):
+                        if row[author_name_key] not in row_authors:
+                            print("row[author_name_key]", row[author_name_key])
+                            # print("row_authors[row[author_name_key]]", row_authors[row[author_name_key]])
+                            if identifier:=authors_info_merged_names.get(row[author_name_key],{}).get('identifier'):
+                                print("he")
+                                row_authors[row[author_name_key]] = {'identifier': identifier}
+                            else:
+                                print("ke")
+                                row_authors[row[author_name_key]] = {}
+                        print("row_authors[row[author_name_key]]", row_authors[row[author_name_key]])
+                        cleaned_affiliation = xnnnn_re.sub(lambda m: chr(int(m.group(1), 16)), row[affiliation_key]).replace('\r', '')
+                        if 'affiliations' not in row_authors[row[author_name_key]]:
+                            row_authors[row[author_name_key]]['affiliations'] = [cleaned_affiliation]
                         else:
-                            row_authors[row[author_name_key]] = {}
-                    if 'affiliations' not in row_authors[row[author_name_key]]:
-                        row_authors[row[author_name_key]]['affiliations'] = [row[affiliation_key]]
-                    else:
-                        row_authors[row[author_name_key]]['affiliations'].append(row[affiliation_key])
+                            row_authors[row[author_name_key]]['affiliations'].append(cleaned_affiliation)
+        print("row_authors",row_authors)
         return row_authors
 
-    def safe_date_parse(self, date_value):
-        if isinstance(date_value, str):
-            # Handle "MM.YYYY" by adding a default day (1st of the month)
-            if date_value.count('.') == 1 and len(date_value.split('.')[1]) == 4:
-                date_value = f"1.{date_value}"  # Convert "3.2020" -> "1.3.2020"
+    def safe_date_parse(self, val):
+        if val is None:
+            return None
 
-            try:
-                parsed_date = parser.parse(date_value, dayfirst=True)
-                return parsed_date  # Return as datetime object
-            except Exception as e:
-                return None  # Return None instead of error string
+        # Already a datetime/date
+        if isinstance(val, datetime):
+            return val.replace(hour=0, minute=0, second=0, microsecond=0)
+        if isinstance(val, date):
+            return datetime(val.year, val.month, val.day)
 
-        elif isinstance(date_value, list) and all(isinstance(i, int) for i in date_value):
-            if len(date_value) == 3:  # [YYYY, MM, DD]
-                year, month, day = date_value
-                return datetime(year, month, day)
+        # Excel serial numbers (1900 date system; handle the 1900 leap bug via base)
+        if isinstance(val, (int, float)) and not (isinstance(val, float) and math.isnan(val)):
+            # crude heuristic: treat "large" numbers as serials
+            if val > 59:  # serial 60 == 1900-02-29 (non-existent), base below skips it
+                base = datetime(1899, 12, 30)
+                return base + timedelta(days=int(val))
 
-            elif len(date_value) == 2:  # [YYYY, MM]
-                year, month = date_value
-                return datetime(year, month, 1)  # Defaults to 1st day of the month
+        s = str(val).strip().replace('\u200e','').replace('\u200f','')
 
-            elif len(date_value) == 1:  # [YYYY]
-                year = date_value[0]
-                return datetime(year, 1, 1)  # Defaults to 1st January of the year
+        # ISO
+        if re.fullmatch(r'\d{4}-\d{2}-\d{2}', s):
+            return datetime.strptime(s, '%Y-%m-%d')
 
-        raise
+        # Day-first with dots: dd.mm.yyyy (matches your header)
+        if re.fullmatch(r'\d{1,2}\.\d{1,2}\.\d{4}', s):
+            return datetime.strptime(s, '%d.%m.%Y')
+
+        # Slash dates: assume US-style m/d/yyyy to avoid inversion
+        if re.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}', s):
+            m, d, y = map(int, s.split('/'))
+            return datetime(y, m, d)
+        from dateutil import parser
+        return parser.parse(s, dayfirst=False, yearfirst=False)
 
     def format_date(self, parsed_date, original_date_str):
         parts = original_date_str.split('-') if '-' in original_date_str else original_date_str.split('.')
@@ -128,7 +203,7 @@ class PubmanCreator(PubmanBase):
         return str(scalar)
 
     def create_talks(self, file_path, create_items=True, submit_items=False, overwrite=False):
-        df = self.parse_excel_table(file_path)
+        df = self.parse_excel_table(file_path, 'Event Name')
         request_list = []
 
         for index, row in df.iterrows():
@@ -309,11 +384,11 @@ class PubmanCreator(PubmanBase):
         return None
 
     def create_publications(self, file_path, submit_items=False, overwrite=False):
-        df = self.parse_excel_table(file_path)
+        df = self.parse_excel_table(file_path, 'Title')
         request_list = []
-
         for index, row in df.iterrows():
             title = row.get('Title')
+            print("creating", title)
             if not title:
                 raise RuntimeError(f"Missing entry for row {index}")
             row_authors_info = self.get_row_authors_info(row)
@@ -472,7 +547,6 @@ class PubmanCreator(PubmanBase):
         self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
 
     def create_items(self, request_list, create_items = True, submit_items=False, overwrite=False):
-        quit()
         item_ids = []
         for criteria, request_json in request_list:
             created_item = None
