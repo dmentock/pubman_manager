@@ -1,4 +1,6 @@
-from fuzzywuzzy import process as fuzz
+# from fuzzywuzzy import process as fuzz
+from fuzzywuzzy import fuzz, process
+
 
 from unidecode import unidecode
 from bs4 import BeautifulSoup
@@ -33,11 +35,11 @@ class DecisionColor(Enum):
         obj.comment = comment
         return obj
 
-    GREEN   = "PuRe match"                     # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
-    ORANGE   = "No info from external APIs, adopting frequent PuRe result" # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
-    GRAY    = "Using publisher affiliation"    # external/publisher adopted
-    PURPLE  = "MPI affiliation detected"       # any MPI case (match/ambiguous/missing/resolved)
-    RED = "No affiliation information"     # nothing available
+    GREEN  = "PuRe match"                     # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
+    ORANGE = "No info from external APIs, adopting frequent PuRe result" # any PuRe-based outcome (fuzzy>=90 or fallback to PuRe)
+    GRAY   = "Using publisher affiliation"    # external/publisher adopted
+    PURPLE = "MPI affiliation detected"       # any MPI case (match/ambiguous/missing/resolved)
+    RED    = "No affiliation information"     # nothing available
 
 
 @dataclass
@@ -52,13 +54,15 @@ class AffiliationResult:
 
 
 def normalize_affiliation(text: str) -> str:
+    if text.startswith('Current affiliation: '):
+        text = text.replace('Current affiliation: ', '')
     return (text or "").replace("  ", ", ").replace(") ", "), ").strip()
 
 def find_best_fuzzy_match(proposed: str, candidates: Iterable[str]) -> Tuple[Optional[str], float]:
     candidates = list(candidates)
     if not proposed or not candidates:
         return None, 1.0
-    match, score = fuzz.extractOne(proposed, candidates)  # score in [0..100]
+    match, score = process.extractOne(proposed, candidates)  # score in [0..100]
     compare_error = (100 - score) / 100.0
     return (match if score >= AFFILIATION_MATCH_THRESHOLD else None), compare_error
 
@@ -124,7 +128,6 @@ class DOIParser:
         RED    = no information, leave blank
         """
 
-        print("affiliations_by_author_name", affiliations_by_author_name)
         external_to_pure_affiliation_cache: Dict[str, str] = {}
         mpi_group_frequencies: Counter = Counter()
         pending_mpi_indices_by_author: Dict[Tuple[str, str], List[int]] = {}
@@ -215,12 +218,11 @@ class DOIParser:
                 if not canon:
                     canon.append(s)
                     continue
-                match = fuzz.extractOne(s, canon, scorer=fuzz.token_set_ratio)
+                match = process.extractOne(s, canon, scorer=fuzz.token_set_ratio)
                 if match and match[1] >= fuzz_threshold:
                     res.affiliation = match[0]
                 else:
                     canon.append(s)
-        print("results_by_author", results_by_author)
         return results_by_author
 
     def download_pdf(self, pdf_link, doi, retries=3):
@@ -311,7 +313,6 @@ class DOIParser:
         results = {}
         for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             crossref_result = self.crossref_manager.get_overview(doi)
-            print("crossref_result", crossref_result)
             results[doi] = crossref_result
         # with ThreadPoolExecutor(max_workers=2) as executor:
         #     futures = {executor.submit(self.crossref_manager.get_overview, doi): doi
@@ -323,8 +324,6 @@ class DOIParser:
         #         results[doi] = crossref_result
         for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             scopus_result = self.scopus_manager.get_overview(doi)
-            print("scopus_result", scopus_result)
-
             if scopus_result:
                 if doi not in results:
                     results[doi] = scopus_result

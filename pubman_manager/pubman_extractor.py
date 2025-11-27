@@ -2,7 +2,8 @@ from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR
 import yaml
 import requests
 import json
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import fuzz, process
+from collections import Counter
 
 class PubmanExtractor(PubmanBase):
 
@@ -35,41 +36,75 @@ class PubmanExtractor(PubmanBase):
                         organizations[org_name] = org.get('identifierPath')
         return organizations
 
+    def _canonicalize_and_rank_affiliations(self, affs, *, threshold=95, replace_old_new=None):
+        """
+        Cluster near-duplicate strings (token_set_ratio >= threshold) and
+        count occurrences. Returns a list of canonical strings sorted by
+        descending frequency; ties keep first-seen order.
+
+        Parameters
+        ----------
+        affs : List[str]
+            Raw affiliations aggregated across all publications for one author.
+        threshold : int
+            FuzzyWuzzy similarity threshold (0..100). 95 ≈ 0.05 distance.
+        replace_old_new : Tuple[str, str] | None
+            Optional (old, new) replacement applied before clustering.
+        """
+        canon = []              # first-seen representatives
+        counts = Counter()      # rep -> frequency
+
+        old, new = (replace_old_new or (None, None))
+
+        for s in affs:
+            s = s.strip().replace('\n', ' ').replace('  ', ' ')
+            if old:
+                s = s.replace(old, new)
+
+            if not canon:
+                canon.append(s)
+                counts[s] += 1
+                continue
+
+            match = process.extractOne(s, canon, scorer=fuzz.token_set_ratio)
+            if match and match[1] >= threshold:
+                rep = match[0]
+            else:
+                rep = s
+                canon.append(rep)
+
+            counts[rep] += 1
+
+        # sort by frequency desc; tie-breaker = first-seen order (index in canon)
+        order_index = {c: i for i, c in enumerate(canon)}
+        ranked = sorted(counts.keys(), key=lambda x: (-counts[x], order_index[x]))
+        return ranked
+
     def process_affiliations(self, affiliation_list):
         """
-        Returns a reduced list of affiliations, based on Levenshtein distance <= 0.15 using fuzzywuzzy.
+        Return a reduced list of affiliations for a single record.
+
+        We collapse near-duplicates within this one publication using
+        fuzzywuzzy token_set_ratio >= 85 (~ Levenshtein distance <= 0.15).
         """
-        reduced_affiliations = []
+        reduced = []
         for affiliation in affiliation_list:
             if '_' in affiliation or 'x0' in affiliation:
                 continue
-            affiliation = affiliation.strip()
-            found_similar = False
-            for reduced_affiliation in reduced_affiliations:
-                ratio = fuzz.ratio(affiliation, reduced_affiliation)
-                if ratio >= 85:
-                    found_similar = True
+            s = affiliation.strip().replace('\n', ' ').replace('  ', ' ')
+            found = False
+            for r in reduced:
+                if fuzz.token_set_ratio(s, r) >= 85:
+                    found = True
                     break
-
-            if not found_similar:
-                reduced_affiliations.append(affiliation.replace('\n',' ').replace('  ', ' '))
-        return reduced_affiliations
+            if not found:
+                reduced.append(s.strip())
+        return reduced
 
     def extract_authors_info(self, publications):
-        def smart_deduplicate(strings, threshold=95):
-            unique = []
-
-            for s in strings:
-                is_duplicate = False
-                for u in unique:
-                    similarity = fuzz.ratio(s, u)
-                    if similarity >= threshold:
-                        is_duplicate = True
-                        break
-                if not is_duplicate:
-                    unique.append(s)
-            return unique
+        # no need for smart_deduplicate; we will cluster at the end
         authors_info = {}
+
         for record in publications:
             metadata = record.get('data', {}).get('metadata', {})
             creators = metadata.get('creators', [])
@@ -77,51 +112,62 @@ class PubmanExtractor(PubmanBase):
                 person = creator.get('person', {})
                 given_name = person.get('givenName', '')
                 family_name = person.get('familyName', '')
-                # Entries like 'Materials Science International Team, MSIT®' have no first name, ignore
-                if given_name and family_name:
-                    organizations = person.get('organizations', [])
-                    affiliation_list = self.process_affiliations([org['name'] for org in organizations])
-                    if (full_name:=(given_name, family_name)) not in authors_info:
-                        authors_info[full_name] = {}
-                    if 'affiliations' in authors_info[full_name]:
-                        authors_info[full_name]['affiliations'].update(affiliation_list)
-                    else:
-                        authors_info[full_name]['affiliations'] = set(affiliation_list)
-                    if (identifier := person.get('identifier')) and 'identifier' not in authors_info[full_name]:
-                        authors_info[full_name]['identifier'] = identifier
 
+                if not (given_name and family_name):
+                    continue
+
+                organizations = person.get('organizations', [])
+                affiliation_list = self.process_affiliations([org['name'] for org in organizations])
+
+                full_name = (given_name, family_name)
+                if full_name not in authors_info:
+                    authors_info[full_name] = {}
+
+                authors_info[full_name].setdefault('affiliations', [])
+                authors_info[full_name]['affiliations'] = list(set(authors_info[full_name]['affiliations'] + affiliation_list))
+
+                if (identifier := person.get('identifier')) and 'identifier' not in authors_info[full_name]:
+                    authors_info[full_name]['identifier'] = identifier
+
+        # remove ambiguous abbreviated-name duplicates
         to_remove = []
         for author in authors_info:
             if '.' in author[0]:
-                if len(author[0].split()[0])<=2:
+                if len(author[0].split()[0]) <= 2:
                     for author_ in authors_info:
                         if len(author[0]) > 2 and author_[1] == author[1] and author[0][0] == author_[0][0]:
                             to_remove.append(author)
                 elif (author[0].split()[0], author[1]) in authors_info:
                     to_remove.append(author)
-            authors_info[author]['affiliations'] = smart_deduplicate(authors_info[author].get('affiliations', []))
-            old = 'Max-Planck-Institut für Eisenforschung GmbH'
-            new = 'Max Planck Institute for Sustainable Materials'
-
-            affs = authors_info[author]['affiliations']
-            authors_info[author]['affiliations'] = [a.replace(old, new) for a in affs]
         for author in set(to_remove):
             del authors_info[author]
 
-        full_names = set()
-        abbreviated_names = set()
-        for name in authors_info.keys():
-            if '.' not in name[0].split()[0]:
-                full_names.add(name)
-            else:
-                abbreviated_names.add(name)
+        # prefer full names over abbreviated variants that share the same surname
+        full_names = {name for name in authors_info.keys() if '.' not in name[0].split()[0]}
+        abbreviated_names = {name for name in authors_info.keys() if '.' in name[0].split()[0]}
         for abbreviated_name in abbreviated_names:
             for full_name in full_names:
-                if abbreviated_name[1] == full_name[1]:
-                    if (not '.' in abbreviated_name[0].split()[0] and abbreviated_name[0].split()[0] == full_name[0].split()[0]) or \
-                       ('.' in abbreviated_name[0].split()[0] and abbreviated_name[0].split()[0][0] == full_name[0].split()[0][0]):
-                      authors_info.pop(abbreviated_name)
-                      break
+                if abbreviated_name[1] != full_name[1]:
+                    continue
+                ab_first = abbreviated_name[0].split()[0]
+                full_first = full_name[0].split()[0]
+                if ('.' not in ab_first and ab_first == full_first) or ('.' in ab_first and ab_first[0] == full_first[0]):
+                    authors_info.pop(abbreviated_name, None)
+                    break
+
+        #  cluster near-duplicates and sort by frequency
+        old = 'Max-Planck-Institut für Eisenforschung GmbH'
+        new = 'Max Planck Institute for Sustainable Materials'
+
+        for author in authors_info:
+            raw_list = authors_info[author].get('affiliations', [])
+            unified_ranked = self._canonicalize_and_rank_affiliations(
+                raw_list,
+                threshold=95,                     # adjust to taste (97 for stricter)
+                replace_old_new=(old, new),
+            )
+            authors_info[author]['affiliations'] = unified_ranked
+
         return authors_info
 
     def extract_journals(self, publications):

@@ -259,7 +259,7 @@ class ScopusManager:
             # Deduplicate while keeping order
             unique_affs = list(dict.fromkeys(x for x in affs if x.strip()))
             if not unique_affs:
-                unique_affs = ["No affiliation available"]
+                unique_affs = []
 
             author_affiliation_map[(first, last)] = unique_affs
 

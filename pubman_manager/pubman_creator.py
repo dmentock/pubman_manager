@@ -2,6 +2,7 @@ import pandas as pd
 from collections import OrderedDict
 from dateutil.parser import ParserError
 from rapidfuzz import process, fuzz
+import json
 
 from dateutil import parser
 from datetime import datetime, date, timedelta
@@ -112,9 +113,7 @@ class PubmanCreator(PubmanBase):
         return data
 
     def get_row_authors_info(self, row):
-        # escape excel carriage return char
         xnnnn_re = re.compile(r"_x([0-9A-Fa-f]{4})_")
-        # normalize whitespace (turn CR/LF etc. into single spaces)
 
         row_authors = OrderedDict()
         authors_info_merged_names = {f'{first_name} {last_name}': affiliations for (first_name, last_name), affiliations in self.authors_info.items()}
@@ -122,26 +121,18 @@ class PubmanCreator(PubmanBase):
             author_name_key = f'Author {i}'
             affiliation_key = f'Affiliation {i}'
             if author_name_key in row and affiliation_key in row:
-                print("author_name_key",author_name_key)
                 if pd.notna(row[author_name_key]) and pd.notna(row[affiliation_key]):
-                    print("nota")
                     if row.get(author_name_key):
                         if row[author_name_key] not in row_authors:
-                            print("row[author_name_key]", row[author_name_key])
-                            # print("row_authors[row[author_name_key]]", row_authors[row[author_name_key]])
                             if identifier:=authors_info_merged_names.get(row[author_name_key],{}).get('identifier'):
-                                print("he")
                                 row_authors[row[author_name_key]] = {'identifier': identifier}
                             else:
-                                print("ke")
                                 row_authors[row[author_name_key]] = {}
-                        print("row_authors[row[author_name_key]]", row_authors[row[author_name_key]])
                         cleaned_affiliation = xnnnn_re.sub(lambda m: chr(int(m.group(1), 16)), row[affiliation_key]).replace('\r', '')
                         if 'affiliations' not in row_authors[row[author_name_key]]:
                             row_authors[row[author_name_key]]['affiliations'] = [cleaned_affiliation]
                         else:
                             row_authors[row[author_name_key]]['affiliations'].append(cleaned_affiliation)
-        print("row_authors",row_authors)
         return row_authors
 
     def safe_date_parse(self, val):
@@ -163,20 +154,38 @@ class PubmanCreator(PubmanBase):
 
         s = str(val).strip().replace('\u200e','').replace('\u200f','')
 
-        # ISO
+        # ISO: yyyy-mm-dd
         if re.fullmatch(r'\d{4}-\d{2}-\d{2}', s):
             return datetime.strptime(s, '%Y-%m-%d')
 
-        # Day-first with dots: dd.mm.yyyy (matches your header)
+        # Day-first with dots: dd.mm.yyyy
         if re.fullmatch(r'\d{1,2}\.\d{1,2}\.\d{4}', s):
             return datetime.strptime(s, '%d.%m.%Y')
 
-        # Slash dates: assume US-style m/d/yyyy to avoid inversion
+        # Slash dates: assume US-style m/d/yyyy
         if re.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}', s):
             m, d, y = map(int, s.split('/'))
             return datetime(y, m, d)
-        from dateutil import parser
-        return parser.parse(s, dayfirst=False, yearfirst=False)
+
+        # Month.Year (e.g., "8.2020") anywhere in the string -> day=1
+        m = re.search(r'(?<!\d)(\d{1,2})[.\-/](\d{4})(?!\d)', s)
+        if m:
+            mth, yr = int(m.group(1)), int(m.group(2))
+            if 1 <= mth <= 12:
+                return datetime(yr, mth, 1)
+
+        # Also accept "yyyy-mm" (e.g., "2020-08") -> day=1
+        m = re.search(r'(?<!\d)(\d{4})-(\d{1,2})(?!\d)', s)
+        if m:
+            yr, mth = int(m.group(1)), int(m.group(2))
+            if 1 <= mth <= 12:
+                return datetime(yr, mth, 1)
+
+        # Fallback: let dateutil try (handles "Aug 2020", etc.). Default day=1 if only month+year found.
+        dt = parser.parse(s, dayfirst=False, yearfirst=False, default=datetime(1900, 1, 1))
+        # If parser only found month+year, it will use default's day=1 already.
+        return dt.replace(hour=0, minute=0, second=0, microsecond=0)
+
 
     def format_date(self, parsed_date, original_date_str):
         parts = original_date_str.split('-') if '-' in original_date_str else original_date_str.split('.')
@@ -218,7 +227,7 @@ class PubmanCreator(PubmanBase):
                     if affiliation in self.identifier_paths.keys():
                         affiliation_entry["identifier"] = self.identifier_paths[affiliation][0]
                     elif not is_mpi_affiliation(affiliation):
-                        affiliation_entry["identifier"] =  'ou_persistent22'
+                        affiliation_entry["identifier"] = 'ou_persistent22'
                     affiliation_list.append(affiliation_entry)
                 identifier = info.get('identifier')
                 metadata_creators.append({
@@ -388,7 +397,6 @@ class PubmanCreator(PubmanBase):
         request_list = []
         for index, row in df.iterrows():
             title = row.get('Title')
-            print("creating", title)
             if not title:
                 raise RuntimeError(f"Missing entry for row {index}")
             row_authors_info = self.get_row_authors_info(row)
@@ -405,9 +413,14 @@ class PubmanCreator(PubmanBase):
                             "identifierPath": [""]
                         })
                     else:
+                        if is_mpi_affiliation(affiliation):
+                            # TODO make more visible to indicate missing mpi group to admin
+                            identifier = 'ou_persistent22'
+                        else:
+                            identifier = 'ou_persistent22'
                         affiliation_list.append({
                             "name": affiliation,
-                            "identifier": 'ou_persistent22',
+                            "identifier": identifier,
                             "identifierPath": [""]
                         })
                 identifier = info.get('identifier')
