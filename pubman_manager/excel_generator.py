@@ -59,7 +59,14 @@ def create_sheet(
     header_to_index = {h: i for i, h in enumerate(headers)}
     visible_headers = [h for h in headers if not h.startswith('Helper ')]
 
-    workbook = xlsxwriter.Workbook(file_path)
+    workbook_target = file_path
+    workbook_options: dict[str, Any] = {}
+    if hasattr(file_path, "write"):
+        workbook_options["in_memory"] = True
+    else:
+        workbook_target = str(file_path)
+
+    workbook = xlsxwriter.Workbook(workbook_target, workbook_options)
     sheet_main = workbook.add_worksheet("MainSheet")
     sheet_names = workbook.add_worksheet("Names")
     sheet_mpi = workbook.add_worksheet("MPI_Affiliations")
