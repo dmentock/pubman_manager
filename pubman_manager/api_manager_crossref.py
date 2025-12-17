@@ -43,6 +43,8 @@ class CrossrefManager:
         }
 
         field = []
+        if title and 'cover feature' in title.lower():
+            field.append('Cover feature (Crossref)')
         if (isbn:=crossref_metadata.get('ISBN')):
             logger.info(f'Skipping Book DOI: {doi}')
             field.append(f'Has ISBN: {isbn}')

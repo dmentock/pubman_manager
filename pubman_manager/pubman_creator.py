@@ -284,7 +284,8 @@ class PubmanCreator(PubmanBase):
         if response.status_code in [200, 201]:
             return response.json()
         else:
-            raise Exception(f"Failed to upload file: {response.status_code} {response.tex
+            raise Exception(f"Failed to upload file: {response.status_code} {response.text}")
+
     def get_first_and_last_name_from_concat(self, name):
         parts = name.split()
         given = []
@@ -601,10 +602,14 @@ class PubmanCreator(PubmanBase):
             if existing:
                 if overwrite:
                     logger.info(f"Overwriting existing publication: '{title}'")
+                    item_already_released = False
                     for pub in existing:
                         deleted = self.delete_item(pub['data']['objectId'], pub['data']['lastModificationDate'])
                         if not deleted:
+                            item_already_released = True
                             logger.info(f"Could not delete publication '{title}', skipping")
+                    if item_already_released:
+                        continue
                 else:
                     logger.info(f"Skipping existing publication: '{criteria}'")
                     pub = existing[0]['data']

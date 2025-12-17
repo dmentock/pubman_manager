@@ -338,6 +338,7 @@ class DOIParser:
                 results[doi]['Field'] = '\n'.join(results[doi]['Field'])
         df = pd.DataFrame.from_dict(results, orient='index').reset_index()
         df.rename(columns={'index': 'DOI'}, inplace=True)
+        df = df.drop_duplicates(subset='DOI', keep='first').reset_index(drop=True)
         return df
 
     def generate_table_from_dois_data(self,
@@ -521,12 +522,28 @@ class DOIParser:
             logger.info(f"Saved empty_path {empty_path} successfully.")
         else:
             n_authors = 45
+            deduped_prefills = []
+            seen_doi_values = set()
+            for entry in dois_data:
+                doi_cell = entry.get('DOI')
+                doi_value = getattr(doi_cell, 'data', None)
+                normalized = doi_value.strip().lower() if isinstance(doi_value, str) else doi_value
+                if normalized and normalized in seen_doi_values:
+                    continue
+                if normalized:
+                    seen_doi_values.add(normalized)
+                deduped_prefills.append(entry)
+
+            if not deduped_prefills:
+                logger.info("All DOIs were duplicates; no sheet written.")
+                return
+
             column_details = OrderedDict({
                 header: [cell.width, cell.comment]
-                for header, cell in dois_data[0].items()
+                for header, cell in deduped_prefills[0].items()
                 if 'Author ' not in header and 'Affiliation ' not in header
             })
             create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
                         column_details, n_authors,'Title',
-                        prefill_publications = dois_data)
+                        prefill_publications=deduped_prefills)
             logger.info(f"Saved {path_out} successfully.")

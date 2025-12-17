@@ -15,7 +15,7 @@ PUBLICATIONS_DIR.mkdir(exist_ok=True)
 TALKS_DIR = PROJECT_ROOT / '.talks'
 TALKS_DIR.mkdir(exist_ok=True)
 
-USER_DATA_DIR = PROJECT_ROOT / 'web' / 'users'
+USER_DATA_DIR = PROJECT_ROOT / 'web' / '.users'
 
 from dotenv import load_dotenv
 import os
