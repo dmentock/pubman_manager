@@ -585,9 +585,8 @@ class PubmanCreator(PubmanBase):
                 "files": files,
             }
 
-            request_list.append(
-                ({"metadata.identifiers.id": doi}, request)
-            )
+            criteria = {"metadata.identifiers": {"id": doi, "type": "DOI"}}
+            request_list.append((criteria, request))
 
         self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
 

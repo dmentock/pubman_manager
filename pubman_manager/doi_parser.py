@@ -271,9 +271,11 @@ class DOIParser:
 
     def has_pubman_entry(self, doi, title=None):
         pub = self.pubman_api.search_publication_by_criteria({
-                    "metadata.identifiers.id": doi,
-                    "metadata.identifiers.type": 'DOI'
-                })
+            "metadata.identifiers": {
+                "id": doi,
+                "type": "DOI",
+            }
+        })
         if not pub and title:
             logger.info(f'Unable to find DOI match in PuRe database, trying to find title instead: "{title}"')
             if len(title) < 50:
@@ -286,9 +288,6 @@ class DOIParser:
                     logger.info(f'Found Title match in Database, ignoring new entry')
                 else:
                     pub = pub_first_half if pub_first_half else pub_latter_half
-        elif pub:
-            if pub[0]['data']['versionState'] == 'PENDING': # Only consider submitted items
-                return False
         return bool(pub)
 
     def get_dois_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> List[str]:

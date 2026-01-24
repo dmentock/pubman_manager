@@ -5,17 +5,19 @@ import copy
 import json
 import re
 from collections import deque
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
+import datetime
 import jwt
+import pandas as pd
 import pytest
 import requests
 
-from pubman_manager import PROJECT_ROOT
+from pubman_manager import PROJECT_ROOT, DOIParser, PubmanCreator
 from pubman_manager.pubman_base import PubmanBase
-from pubman_manager.pubman_creator import PubmanCreator
 
 # ----------------------------
 # pytest command-line option
@@ -81,12 +83,28 @@ _SERVICE_PATTERNS: Dict[str, re.Pattern[str]] = {
 
 _PUBMAN_LOGIN_URL = "https://pure.mpg.de/rest/login"
 _PUBMAN_CREATE_ITEM_URL = "https://pure.mpg.de/rest/items"
+_PUBMAN_PAYLOAD_FILE = "pubman_payloads.json"
+_PUBMAN_JSON_FILE = "pubman.json"
+
+
+@dataclass
+class DoiTestResult:
+    description: str
+    doi: str
+    dois_data: pd.DataFrame
+    table_overview: list[dict]
+    excel_path: Optional[Path]
+    excel_dataframe: Optional[pd.DataFrame]
+    capture_pubman_creations: list[dict]
+    http_create_payloads: list[dict]
 
 
 def _normalize(value: Any) -> Any:
     """Convert paths, sets, dicts, etc., to JSON-serializable values."""
     if isinstance(value, Path):
         return str(value)
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
     if isinstance(value, (bytes, bytearray)):
         return value.decode("utf-8", errors="replace")
     if isinstance(value, dict):
@@ -224,7 +242,7 @@ def external_http_cache(monkeypatch, request, test_resources_dir):
     }
 
     # Tests can inspect collected payloads via external_http_cache.create_item_payloads.
-    state = SimpleNamespace(create_item_payloads=[])
+    state = SimpleNamespace(create_item_payloads=[], result_dir=base_dir)
 
     # ---------------------------------------------------------
     # RECORD MODE
@@ -346,3 +364,99 @@ def external_http_cache(monkeypatch, request, test_resources_dir):
             raise AssertionError(
                 f"{len(remaining)} recorded {svc} calls were NOT replayed."
             )
+
+
+def _write_pubman_payloads(cache_dir: Path, payloads: list[dict[str, Any]]) -> None:
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / _PUBMAN_PAYLOAD_FILE).write_text(
+        json.dumps({"payloads": payloads}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    calls = [
+        {
+            "method": "POST",
+            "url": _PUBMAN_CREATE_ITEM_URL,
+            "payload": payload,
+        }
+        for payload in payloads
+    ]
+    (cache_dir / _PUBMAN_JSON_FILE).write_text(
+        json.dumps({"calls": calls}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _load_pubman_payloads(cache_dir: Path) -> Optional[list[dict[str, Any]]]:
+    cache_file = cache_dir / _PUBMAN_PAYLOAD_FILE
+    if not cache_file.exists():
+        return None
+    data = json.loads(cache_file.read_text(encoding="utf-8"))
+    return data.get("payloads", [])
+
+
+@pytest.fixture
+def run_doi_test(
+    monkeypatch,
+    external_http_cache,
+    mock_pubman,
+    capture_pubman_creations,
+    tmp_path,
+    request,
+):
+    update_mode = request.config.getoption("--update")
+    cache_dir = external_http_cache.result_dir
+
+    def _runner(
+        doi: str,
+        *,
+        description: Optional[str] = None,
+        force: bool = False,
+        write_excel: bool = False,
+    ) -> DoiTestResult:
+        monkeypatch.setattr(DOIParser, "download_pdf", lambda self, link, doi, retries=3: True)
+
+        pubman_api = PubmanCreator()
+        doi_parser = DOIParser(pubman_api)
+
+        dois_data = doi_parser.collect_data_for_dois([doi], [doi])
+        table_overview = doi_parser.generate_table_from_dois_data(dois_data, force=force)
+
+        excel_path = None
+        excel_df = None
+        if write_excel and table_overview:
+            date_str = datetime.datetime.now().strftime("%d.%m.%Y")
+            out_dir = tmp_path / "new"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            excel_path = out_dir / f"doi_overview_{date_str}.xlsx"
+            doi_parser.write_dois_data(excel_path, table_overview)
+            pubman_api.create_publications(excel_path, overwrite=True, submit_items=False)
+            excel_df = pd.read_excel(excel_path)
+
+        result = DoiTestResult(
+            description=description or doi,
+            doi=doi,
+            dois_data=dois_data,
+            table_overview=table_overview,
+            excel_path=excel_path,
+            excel_dataframe=excel_df,
+            capture_pubman_creations=list(capture_pubman_creations),
+            http_create_payloads=list(external_http_cache.create_item_payloads),
+        )
+
+        if table_overview and capture_pubman_creations:
+            normalized_payloads = _normalize(external_http_cache.create_item_payloads)
+            expected_payloads = _load_pubman_payloads(cache_dir)
+            if update_mode:
+                _write_pubman_payloads(cache_dir, normalized_payloads)
+            elif expected_payloads is None:
+                raise RuntimeError(
+                    f"No cached Pubman upload for {request.node.nodeid}. Run pytest --update to record it."
+                )
+            else:
+                assert normalized_payloads == expected_payloads, (
+                    "Pubman upload mismatch. Re-run pytest with --update to refresh expectations."
+                )
+
+        return result
+
+    return _runner

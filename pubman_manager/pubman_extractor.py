@@ -36,7 +36,7 @@ class PubmanExtractor(PubmanBase):
                         organizations[org_name] = org.get('identifierPath')
         return organizations
 
-    def _canonicalize_and_rank_affiliations(self, affs, *, threshold=95):
+    def _canonicalize_and_rank_affiliations(self, affs, *, threshold=95, replace_old_new=None):
         """
         Cluster near-duplicate strings (token_set_ratio >= threshold) and
         count occurrences. Returns a list of canonical strings sorted by
@@ -51,9 +51,12 @@ class PubmanExtractor(PubmanBase):
         """
         canon = []              # first-seen representatives
         counts = Counter()      # rep -> frequency
+        old, new = (replace_old_new or (None, None))
 
         for s in affs:
             s = s.strip().replace('\n', ' ').replace('  ', ' ')
+            if old:
+                s = s.replace(old, new)
 
             if not canon:
                 canon.append(s)
@@ -151,16 +154,14 @@ class PubmanExtractor(PubmanBase):
                     break
 
         #  cluster near-duplicates and sort by frequency
+        old = 'Max-Planck-Institut für Eisenforschung GmbH'
         for author in authors_info:
             raw_list = list(authors_info[author].get('affiliations', []))
-            if any('eisenforschung' in aff.lower() for aff in raw_list) and sustainable_affiliation not in raw_list:
-                raw_list.append(sustainable_affiliation)
             unified_ranked = self._canonicalize_and_rank_affiliations(
                 raw_list,
                 threshold=95,                     # adjust to taste (97 for stricter)
+                replace_old_new=(old, sustainable_affiliation),
             )
-            if sustainable_affiliation in raw_list and sustainable_affiliation not in unified_ranked:
-                unified_ranked.append(sustainable_affiliation)
             authors_info[author]['affiliations'] = unified_ranked
 
         return authors_info
