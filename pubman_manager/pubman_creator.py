@@ -3,7 +3,6 @@ import logging
 import math
 import re
 import requests
-import yaml
 
 from collections import OrderedDict
 from datetime import datetime, date, timedelta
@@ -13,7 +12,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR, FILES_DIR
-from pubman_manager.util import is_mpi_affiliation
+from pubman_manager.util import is_mpi_affiliation, load_yaml
 
 
 logger = logging.getLogger(__name__)
@@ -30,12 +29,9 @@ class PubmanCreator(PubmanBase):
     def __init__(self, base_url="https://pure.mpg.de/rest", auth_token=None, user_id=None):
         super().__init__(auth_token=auth_token, user_id=user_id, base_url=base_url)
 
-        with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'r') as f:
-            self.identifier_paths = yaml.load(f, Loader=yaml.FullLoader)
-        with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r') as f:
-            self.authors_info = yaml.load(f, Loader=yaml.FullLoader)
-        with open(PUBMAN_CACHE_DIR / 'journals.yaml', 'r') as f:
-            self.journals = yaml.load(f, Loader=yaml.FullLoader)
+        self.identifier_paths = load_yaml(PUBMAN_CACHE_DIR / 'identifier_paths.yaml')
+        self.authors_info = load_yaml(PUBMAN_CACHE_DIR / 'authors_info.yaml')
+        self.journals = load_yaml(PUBMAN_CACHE_DIR / 'journals.yaml')
 
 
     @staticmethod

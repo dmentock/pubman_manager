@@ -1,9 +1,10 @@
 from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR
-import yaml
 import requests
 import json
 from fuzzywuzzy import fuzz, process
-from collections import Counter
+from collections import Counter, defaultdict
+from pathlib import Path
+from pubman_manager.util import save_yaml, load_yaml
 
 class PubmanExtractor(PubmanBase):
 
@@ -12,17 +13,12 @@ class PubmanExtractor(PubmanBase):
         publications = []
         org_publications = self.search_publications_by_organization(org_id, size=200000)
         publications.extend(org_publications)
-        with open(PUBMAN_CACHE_DIR / "publications.yaml", "w") as f:
-            yaml.dump(publications, f)
+        save_yaml(publications, PUBMAN_CACHE_DIR / "publications.yaml")
         authors_info = self.extract_authors_info(publications)
-        authors_info[('Dierk', 'Raabe')]['affiliations'] = ['Microstructure Physics and Alloy Design, Max Planck Institute for Sustainable Materials, Max Planck Society']
-        with open(PUBMAN_CACHE_DIR / "authors_info.yaml", "w") as f:
-            yaml.dump(authors_info, f)
-        with open(PUBMAN_CACHE_DIR / 'identifier_paths.yaml', 'w', encoding='utf-8') as f:
-            yaml.dump(self.extract_organization_mapping(publications), f)
+        save_yaml(authors_info, PUBMAN_CACHE_DIR / "authors_info.yaml")
+        save_yaml(self.extract_organization_mapping(publications), PUBMAN_CACHE_DIR / "identifier_paths.yaml")
         journals = self.extract_journals(publications)
-        with open(PUBMAN_CACHE_DIR / "journals.yaml", "w") as f:
-            yaml.dump(journals, f)
+        save_yaml(journals, PUBMAN_CACHE_DIR / "journals.yaml")
 
     def extract_organization_mapping(self, data):
         organizations = {}
@@ -75,7 +71,7 @@ class PubmanExtractor(PubmanBase):
         # sort by frequency desc; tie-breaker = first-seen order (index in canon)
         order_index = {c: i for i, c in enumerate(canon)}
         ranked = sorted(counts.keys(), key=lambda x: (-counts[x], order_index[x]))
-        return ranked
+        return counts
 
     def process_affiliations(self, affiliation_list):
         """
@@ -101,8 +97,7 @@ class PubmanExtractor(PubmanBase):
     def extract_authors_info(self, publications):
         # no need for smart_deduplicate; we will cluster at the end
         authors_info = {}
-        sustainable_affiliation = 'Max Planck Institute for Sustainable Materials'
-
+        raw_affiliations_by_author = defaultdict(list)
         for record in publications:
             metadata = record.get('data', {}).get('metadata', {})
             creators = metadata.get('creators', [])
@@ -121,8 +116,7 @@ class PubmanExtractor(PubmanBase):
                 if full_name not in authors_info:
                     authors_info[full_name] = {}
 
-                authors_info[full_name].setdefault('affiliations', [])
-                authors_info[full_name]['affiliations'] = list(set(authors_info[full_name]['affiliations'] + affiliation_list))
+                raw_affiliations_by_author[full_name].extend(affiliation_list)
 
                 if (identifier := person.get('identifier')) and 'identifier' not in authors_info[full_name]:
                     authors_info[full_name]['identifier'] = identifier
@@ -154,16 +148,23 @@ class PubmanExtractor(PubmanBase):
                     break
 
         #  cluster near-duplicates and sort by frequency
-        old = 'Max-Planck-Institut für Eisenforschung GmbH'
         for author in authors_info:
-            raw_list = list(authors_info[author].get('affiliations', []))
-            unified_ranked = self._canonicalize_and_rank_affiliations(
+            raw_list = list(raw_affiliations_by_author.get(author, []))
+            unified_counts = self._canonicalize_and_rank_affiliations(
                 raw_list,
                 threshold=95,                     # adjust to taste (97 for stricter)
-                replace_old_new=(old, sustainable_affiliation),
             )
-            authors_info[author]['affiliations'] = unified_ranked
+            authors_info[author]['affiliation_counts'] = dict(unified_counts)
 
+        director_path = Path(__file__).resolve().parents[1] / "director_affiliations.yaml"
+        entries = load_yaml(director_path)
+        for entry in entries:
+            first = entry["first_name"]
+            last = entry["last_name"]
+            affiliation = entry["affiliation"]
+            key = (first, last)
+            authors_info.setdefault(key, {})
+            authors_info[key]["affiliation_counts"] = {affiliation: 1}
         return authors_info
 
     def extract_journals(self, publications):

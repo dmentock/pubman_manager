@@ -13,14 +13,12 @@ yaml_obj = YAML(typ="unsafe")
 def is_mpi_affiliation(affiliation: str) -> bool:
     return bool(re.compile(r'max[-\s–]?planck[-\s–]+i', re.IGNORECASE).search(affiliation))
 
-def load_yaml(file_path, default_return=None):
+def load_yaml(file_path):
     path = Path(file_path)
-    while True:
-        if not path.exists():
-            logger.warning("WARNING: '%s' does not exist", path)
-            return {} if default_return is None else default_return
-        with path.open("r", encoding="utf-8") as fh:
-            return yaml_obj.load(fh)
+    if not path.exists():
+        raise FileNotFoundError(f"YAML file not found: {path}")
+    with path.open("r", encoding="utf-8") as fh:
+        return yaml_obj.load(fh)
 
 def save_yaml(data, file_path):
     path = Path(file_path)

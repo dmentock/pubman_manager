@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 from pathlib import Path
 import pandas as pd
 from collections import OrderedDict, Counter
-import yaml
 import requests
 import unicodedata
 import os
@@ -21,7 +20,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple, Iterable, Optional
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
-from pubman_manager.util import date_to_cell
+from pubman_manager.util import date_to_cell, load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +71,16 @@ class DOIParser:
         self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key)
 
         self.pubman_api = pubman_api
-        with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
-            self.affiliations_by_name_pubman = yaml.load(f, Loader=yaml.FullLoader)
+        raw_authors_info = load_yaml(PUBMAN_CACHE_DIR / 'authors_info.yaml')
+        self.authors_affiliation_counters = {
+            author: Counter(info["affiliation_counts"])
+            for author, info in raw_authors_info.items()
+        }
         mpi_affiliation_counter = Counter()
-        for author, author_info in self.affiliations_by_name_pubman.items():
-            for affiliation in author_info['affiliations']:
+        for author, counter in self.authors_affiliation_counters.items():
+            for affiliation, count in counter.items():
                 if 'Max-Planck' in affiliation:
-                    mpi_affiliation_counter[affiliation]+=1
+                    mpi_affiliation_counter[affiliation] += count
         self.mpi_affiliations = [item[0] for item in sorted(mpi_affiliation_counter.items(), key=lambda x: x[1], reverse=True)]
         self.af_id_ = None
 
@@ -126,60 +128,60 @@ class DOIParser:
         GRAY   = publisher/external
         PURPLE = MPI-Affiliation
         RED    = no information, leave blank
+
+        Parameters
+        ----------
+        affiliations_by_author_name : dict
+            Publication affiliation, mapping from (first_name, last_name) to list of affiliations (str) from publication.
+        fuzz_threshold : int
+            Fuzzy matching threshold (0-100) to match affiliation from PuRe to publication affiliation.
+
+        Returns
+        -------
+        Dict[Tuple[str, str], List[AffiliationResult]]
+            Mapping from (first_name, last_name) to list of PuRe-matched AffiliationResult
+
         """
 
-        external_to_pure_affiliation_cache: Dict[str, str] = {}
-        mpi_group_frequencies: Counter = Counter()
-        pending_mpi_indices_by_author: Dict[Tuple[str, str], List[int]] = {}
-        mpi_affiliations_by_author: Dict[Tuple[str, str], List[str]] = {}
-
+        cache: Dict[str, str] = {}
         results_by_author: Dict[Tuple[str, str], List[AffiliationResult]] = {}
 
-        for (first_name, last_name), journal_affiliations in affiliations_by_author_name.items():
+        for (first_name, last_name), publication_affiliations in affiliations_by_author_name.items():
             resolved_author: Tuple[str, str] = self.compare_author_name_to_pure_db(
-                self.affiliations_by_name_pubman.keys(), first_name, last_name
+                self.authors_affiliation_counters.keys(), first_name, last_name
             )
             author_results: List[AffiliationResult] = []
-            pure_affiliations: List[str] = list(self.affiliations_by_name_pubman.get(resolved_author, {}).get("affiliations", []))
+            pure_affiliations: List[str] = sorted(self.authors_affiliation_counters.get(resolved_author, {}).keys(),
+                                                  key=lambda x: self.authors_affiliation_counters.get(resolved_author, {}).get(x, 0),
+                                                  reverse=True) if resolved_author in self.authors_affiliation_counters else []
 
-            for journal_affiliation in journal_affiliations:
+            for publication_affiliation in publication_affiliations:
+                is_mpi = is_mpi_affiliation(publication_affiliation)
+
+                if is_mpi:
+                    mpi_affiliations_for_author = [a for a in pure_affiliations if is_mpi_affiliation(a)]
+                    if mpi_affiliations_for_author:
+                        # Pick the most frequent MPI affiliation for this author
+                        author_results.append(AffiliationResult(mpi_affiliations_for_author[0], DecisionColor.PURPLE))
+                    else:
+                        # No PuRe MPI data, leave blank
+                        author_results.append(AffiliationResult("", DecisionColor.PURPLE))
+                    continue
+
+                # Non-MPI
                 if pure_affiliations:
-                    if is_mpi_affiliation(journal_affiliation):
-                        mpi_affiliations_for_author = [a for a in pure_affiliations if is_mpi_affiliation(a)]
-                        for mpi_group in mpi_affiliations_for_author:
-                            mpi_group_frequencies[mpi_group] += 1
-                        if len(mpi_affiliations_for_author) == 1:
-                            mpi_group = mpi_affiliations_for_author[0]
-                            author_results.append(AffiliationResult(affiliation=mpi_group, color=DecisionColor.PURPLE))
-                        else:
-                            # Assume authors can only have one mpi affiliation at a time
-                            author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
-                            mpi_affiliations_by_author[resolved_author] = mpi_affiliations_for_author
-                            pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
+                    if publication_affiliation in cache:
+                        author_results.append(AffiliationResult(cache[publication_affiliation], DecisionColor.GREEN))
                     else:
-                        if journal_affiliation in external_to_pure_affiliation_cache:
-                            mapped = external_to_pure_affiliation_cache[journal_affiliation]
-                            author_results.append(AffiliationResult(affiliation=mapped, color=DecisionColor.GREEN))
+                        external_pure_affiliations: List[str] = [affiliation for affiliation in pure_affiliations if not is_mpi_affiliation(affiliation)]
+                        best_match, compare_error = find_best_fuzzy_match(publication_affiliation, external_pure_affiliations)
+                        if best_match:
+                            cache[publication_affiliation] = best_match
+                            author_results.append(AffiliationResult(best_match, DecisionColor.GREEN, compare_error=compare_error))
                         else:
-                            external_pure_affiliations: List[str] = [affiliation for affiliation in pure_affiliations if not is_mpi_affiliation(affiliation)]
-                            best_match, compare_error = find_best_fuzzy_match(journal_affiliation, external_pure_affiliations)
-                            if best_match:
-                                external_to_pure_affiliation_cache[journal_affiliation] = best_match
-                                author_results.append(
-                                    AffiliationResult(affiliation=best_match, color=DecisionColor.GREEN, compare_error=compare_error)
-                                )
-                            else:
-                                author_results.append(
-                                    AffiliationResult(affiliation=normalize_affiliation(journal_affiliation), color=DecisionColor.GRAY)
-                                )
+                            author_results.append(AffiliationResult(normalize_affiliation(publication_affiliation), DecisionColor.GRAY))
                 else:
-                    if is_mpi_affiliation(journal_affiliation):
-                        author_results.append(AffiliationResult(affiliation="", color=DecisionColor.PURPLE))
-                        pending_mpi_indices_by_author.setdefault(resolved_author, []).append(len(author_results) - 1)
-                    else:
-                        author_results.append(
-                            AffiliationResult(affiliation=normalize_affiliation(journal_affiliation), color=DecisionColor.GRAY)
-                        )
+                    author_results.append(AffiliationResult(normalize_affiliation(publication_affiliation), DecisionColor.GRAY))
 
             if not author_results:
                 if pure_affiliations:
@@ -190,23 +192,18 @@ class DOIParser:
 
             results_by_author[resolved_author] = author_results
 
-        most_common_mpi_group: str = (
-            mpi_group_frequencies.most_common(1)[0][0] if mpi_group_frequencies else self.mpi_affiliations[0]
-        )
-
-        for resolved_author, indices in pending_mpi_indices_by_author.items():
-            allowed = mpi_affiliations_by_author.get(resolved_author, [])
-            pick = None
-            if allowed:
-                allowed_set = set(allowed)
-                for grp, _cnt in mpi_group_frequencies.most_common():
-                    if grp in allowed_set:
-                        pick = grp
-                        break
-            if pick is None:
-                pick = most_common_mpi_group
-            for idx in indices:
-                results_by_author[resolved_author][idx].affiliation = pick  # dataclass is mutable
+        # Post-processing: Ensure consistency across authors
+        assigned_mpi = [res.affiliation for author_results in results_by_author.values() for res in author_results if res.color == DecisionColor.PURPLE and res.affiliation]
+        if assigned_mpi:
+            most_common_aff = Counter(assigned_mpi).most_common(1)[0][0]
+            for author, author_results in results_by_author.items():
+                pure_affiliations = sorted(self.authors_affiliation_counters.get(author, {}).keys(), key=lambda x: self.authors_affiliation_counters.get(author, {}).get(x, 0), reverse=True) if author in self.authors_affiliation_counters else []
+                for res in author_results:
+                    # If an author's most common mpi group is not the same as the most common group from this publication,
+                    # but the author has been part of this publication-specific group in the past, override common author group with common publication group
+                    if res.color == DecisionColor.PURPLE and res.affiliation and res.affiliation != most_common_aff and \
+                        most_common_aff in [a for a in pure_affiliations if is_mpi_affiliation(a)]:
+                        res.affiliation = most_common_aff
 
         # Assume that very similar affiliations overlap (see fuzz_threshold)
         canon: list[str] = []
@@ -542,7 +539,7 @@ class DOIParser:
                 for header, cell in deduped_prefills[0].items()
                 if 'Author ' not in header and 'Affiliation ' not in header
             })
-            create_sheet(path_out, {author: author_info.get('affiliations', []) for author, author_info in self.affiliations_by_name_pubman.items()},
+            create_sheet(path_out, self.authors_affiliation_counters,
                         column_details, n_authors,'Title',
                         prefill_publications=deduped_prefills)
             logger.info(f"Saved {path_out} successfully.")

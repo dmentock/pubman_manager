@@ -30,7 +30,7 @@ def col_num_to_col_letter(col_num: int) -> str:
 
 def create_sheet(
     file_path: str,
-    affiliations_by_name_pubman: Dict[Tuple[str, str], List[str]],
+    affiliations_by_name_pubman: Dict[Tuple[str, str], Dict[str, int]],
     column_details: "OrderedDict[str, Tuple[int, str]]",
     n_authors: int,
     header_name: str,
@@ -87,7 +87,7 @@ def create_sheet(
     sheet_names.write('B1', 'Affiliations')
     for row_idx, (fn, ln) in enumerate(name_pairs, start=1):
         sheet_names.write(row_idx, 0, f"{fn} {ln}")
-        for col_idx, aff in enumerate(affiliations_by_name_pubman[(fn, ln)], start=1):
+        for col_idx, aff in enumerate(sorted(affiliations_by_name_pubman[(fn, ln)].keys(), key=lambda x: affiliations_by_name_pubman[(fn, ln)][x], reverse=True), start=1):
             sheet_names.write(row_idx, col_idx, aff)
 
     for hidden_row_index, display_name in enumerate(full_names):
@@ -97,7 +97,7 @@ def create_sheet(
 
     mpi_counts = Counter()
     for fn, ln in name_pairs:
-        for aff in affiliations_by_name_pubman[(fn, ln)]:
+        for aff in affiliations_by_name_pubman[(fn, ln)].keys():
             if ('Max Planck' in aff) or ('Max-Planck' in aff):
                 mpi_counts[aff] += 1
     mpi_sorted = [aff for aff, _ in mpi_counts.most_common()]
