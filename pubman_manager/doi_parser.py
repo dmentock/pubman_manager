@@ -184,12 +184,8 @@ class DOIParser:
                     author_results.append(AffiliationResult(normalize_affiliation(publication_affiliation), DecisionColor.GRAY))
 
             if not author_results:
-                if pure_affiliations:
-                    author_results.append(AffiliationResult(affiliation=pure_affiliations[0],
-                                                            color=DecisionColor.PURPLE if is_mpi_affiliation(pure_affiliations[0]) else DecisionColor.ORANGE))
-                else:
-                    author_results.append(AffiliationResult(affiliation="", color=DecisionColor.RED))
-
+                author_results.append(AffiliationResult(affiliation=pure_affiliations[0] if pure_affiliations else "",
+                                                        color=DecisionColor.RED))
             results_by_author[resolved_author] = author_results
 
         # Post-processing: Ensure consistency across authors
@@ -287,27 +283,35 @@ class DOIParser:
                     pub = pub_first_half if pub_first_half else pub_latter_half
         return bool(pub)
 
-    def get_dois_for_author(self, author: str, pubyear_start=None, pubyear_end=None) -> List[str]:
-        dois_crossref = self.crossref_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
-        dois_scopus = self.scopus_manager.get_dois_for_author(author, pubyear_start, pubyear_end)
+    def get_dois_for_author(
+        self,
+        author: str,
+        pubyear_start=None,
+        pubyear_end=None,
+        processed_dois: Optional[Iterable[str]] = None,
+        split: bool = False,
+    ) -> List[str] | Tuple[List[str], List[str]]:
+        if isinstance(author, (tuple, list)):
+            first_name = author[0] if author else ""
+            last_name = " ".join(author[1:]).strip() if len(author) > 1 else ""
+        else:
+            parts = str(author).split()
+            first_name = parts[0] if parts else ""
+            last_name = " ".join(parts[1:]).strip()
+        dois_crossref = self.crossref_manager.get_dois_for_author(first_name, last_name, pubyear_start, pubyear_end)
+        dois_scopus = self.scopus_manager.get_dois_for_author(first_name, last_name, pubyear_start, pubyear_end)
+        if processed_dois:
+            processed_set = set(processed_dois)
+            dois_crossref = [d for d in dois_crossref if d not in processed_set]
+            dois_scopus = [d for d in dois_scopus if d not in processed_set]
+        if split:
+            return dois_crossref, dois_scopus
         return list(set(dois_crossref).union(set(dois_scopus)))
 
-    def collect_data_for_dois(self, dois_crossref: List[str], dois_scopus: List[str], processed_dois=None) -> pd.DataFrame:
+    def collect_data_for_dois(self, dois_crossref: List[str], dois_scopus: List[str]) -> pd.DataFrame:
         results = {}
-        dois = set(list(dois_crossref) + list(dois_scopus))
-        processed_dois = set(processed_dois) if processed_dois else set()
-        dois = set(dois)
-        dois_to_process = list(dois - processed_dois)
-
+        dois_to_process = list(set(list(dois_crossref) + list(dois_scopus)))
         for doi in dois_to_process:
-            if self.has_pubman_entry(doi):
-                logger.info(f'Found Publication for {doi} in PuRe, skipping...')
-                processed_dois.add(doi)
-
-        if processed_dois:
-            logger.info(f'Skipping already processed dois: {len(processed_dois)}')
-        results = {}
-        for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
             crossref_result = self.crossref_manager.get_overview(doi)
             results[doi] = crossref_result
         # with ThreadPoolExecutor(max_workers=2) as executor:
@@ -318,7 +322,7 @@ class DOIParser:
         #         crossref_result = future.result()
         #         print("crossref_result",crossref_result)
         #         results[doi] = crossref_result
-        for doi in [doi for doi in dois_to_process if not doi in processed_dois]:
+        for doi in dois_to_process:
             scopus_result = self.scopus_manager.get_overview(doi)
             if scopus_result:
                 if doi not in results:
@@ -337,22 +341,17 @@ class DOIParser:
         df = df.drop_duplicates(subset='DOI', keep='first').reset_index(drop=True)
         return df
 
-    def generate_table_from_dois_data(self,
-                                      dois_data: pd.DataFrame,
-                                      force=False) -> List[OrderedDict[str, Tuple[str, int, str]]]:
+    def process_dois(
+        self,
+        dois_data: pd.DataFrame,
+        force: bool = False,
+    ) -> List[OrderedDict[str, Tuple[str, int, str]]]:
         """
-        Takes overview dataframe, collects all data for DOIs which are not yet on PuRe and have Scopus and Crossref entries.
-        Generates dataframe which can be passed to the excel_generator.create_sheet method to prefill the sheet with data.
+        Filter and enrich DOI data (MPI checks + author/affiliation matching).
 
-        Result
-        ------
-
-        Each entry in the result list is a dict that corresponds to a publication.
-        The dict maps column data to a tuple, e.g. `"Title": (title, 35)`
-        Where "title" is the value for this column, "35" is the width of the column on the excel, and the last entry is an optional Tooltip to be displayed
-
+        Returns a list of processed publication dicts that can be converted to table rows.
         """
-        table_overview = []
+        processed: List[OrderedDict[str, Tuple[str, int, str]]] = []
         for index, row in dois_data.iterrows():
             if row['Field'] and not force:
                 logger.info(f'Skipping {row["DOI"]}, reason: {row["Field"]}')
@@ -468,15 +467,23 @@ class DOIParser:
                 continue
             cleaned_author_list = self.compare_author_list_to_pure_db(affiliations_by_name)
             is_mpi_publication = False
+            has_affiliation_info = False
             for (first_name, last_name), affiliations_info in cleaned_author_list.items():
                 for affiliation_info in affiliations_info:
+                    if affiliation_info.affiliation:
+                        has_affiliation_info = True
                     if is_mpi_affiliation(affiliation_info.affiliation):
                         is_mpi_publication = True
-            if not is_mpi_publication:
+            if not is_mpi_publication and has_affiliation_info:
                 logger.error('Publication has no author from Max Planck Institute, skipping...')
                 continue
 
             missing_pdf = True if license_type!='closed' and not pdf_found else False
+            authors_affiliations = []
+            for (first_name, last_name), affiliations_info in cleaned_author_list.items():
+                for affiliation_info in affiliations_info:
+                    authors_affiliations.append((f"{first_name} {last_name}", affiliation_info))
+
             prefill_publication = OrderedDict({
                 "Title": Cell(title, 35),
                 "Journal Title": Cell(journal_title, 25),
@@ -493,22 +500,24 @@ class DOIParser:
                 'License year': Cell(license_year if license_type=='open' else '', 15),
                 'Pdf found': Cell('' if license_type=='closed' else 'y' if pdf_found else 'n', 15,
                                   color='RED' if missing_pdf else '',
-                                  comment = 'Please upload the file and license info when submitting in PuRe'
+                                  comment='Please upload the file and license info when submitting in PuRe'
                                   if missing_pdf else ''),
                 'Crossref Link': Cell(link, 20),
-                'Scopus Link': Cell(row.get('scopus', ''), 15)
+                'Scopus Link': Cell(row.get('scopus', ''), 15),
             })
             i = 1
-            for (first_name, last_name), affiliations_info in cleaned_author_list.items():
-                for affiliation_info in affiliations_info:
-                    prefill_publication[f"Author {i}"] = Cell(first_name + ' ' + last_name)
-                    prefill_publication[f"Affiliation {i}"] = Cell(affiliation_info.affiliation,
-                                                                   color = affiliation_info.color.name,
-                                                                   compare_error = affiliation_info.compare_error,
-                                                                   comment = affiliation_info.comment)
-                    i = i+1
-            table_overview.append(prefill_publication)
-        return table_overview
+            for author_name, affiliation_info in authors_affiliations:
+                prefill_publication[f"Author {i}"] = Cell(author_name)
+                prefill_publication[f"Affiliation {i}"] = Cell(
+                    affiliation_info.affiliation,
+                    color=affiliation_info.color.name,
+                    compare_error=affiliation_info.compare_error,
+                    comment=affiliation_info.comment,
+                )
+                i += 1
+            processed.append(prefill_publication)
+        return processed
+
 
     def write_dois_data(self, path_out, dois_data):
         if not dois_data:

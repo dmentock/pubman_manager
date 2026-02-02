@@ -131,10 +131,9 @@ class ScopusManager:
                     if reset_hdr:
                         try:
                             wait = int(reset_hdr) - int(time.time()) + 1  # +1s buffer
-                            logger.info(f"Rate limit resets in {wait} seconds. Sleeping...")
-                            time.sleep(max(wait, 1))
+                            raise RuntimeError(f"Rate limit resets in {wait} seconds")
                         except Exception as e:
-                            logger.warning(f"Failed to parse X-RateLimit-Reset: {reset_hdr} ({e})")
+                            raise RuntimeError(f"Failed to parse X-RateLimit-Reset: {reset_hdr} ({e})")
                     else:
                         logger.info("No X-RateLimit-Reset header found. Sleeping default 30s.")
                 else:
@@ -290,7 +289,7 @@ class ScopusManager:
                 if entries and entries[0].get('dc:identifier'):
                     self.author_id_map[author_name] = entries[0].get('dc:identifier').split(':')[-1]
                 else:
-                    raise ValueError("Author not found in Scopus.")
+                    self.author_id_map[author_name] = None
             else:
                 raise RuntimeError(f"Scopus Author query API error {response.status_code}: {response.text}")
         return self.author_id_map[author_name]
@@ -305,6 +304,8 @@ class ScopusManager:
         Use Scopus API to generate a list of DOIs for an author using their Author ID.
         """
         author_id = self.get_author_id(first_name, last_name)
+        if not author_id:
+            return []
         query_components = [f'AU-ID({author_id})']
         if pubyear_start:
             query_components.append(f'PUBYEAR > {pubyear_start - 1}')
@@ -335,7 +336,7 @@ class ScopusManager:
 
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f'Scopus data: {data}')
+                logger.debug(f'Scopus data: {data}')
 
                 total_results = int(data['search-results']['opensearch:totalResults'])
                 entries = data['search-results'].get('entry', [])

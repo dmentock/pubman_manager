@@ -419,7 +419,7 @@ def run_doi_test(
         doi_parser = DOIParser(pubman_api)
 
         dois_data = doi_parser.collect_data_for_dois([doi], [doi])
-        table_overview = doi_parser.generate_table_from_dois_data(dois_data, force=force)
+        table_overview = doi_parser.process_dois(dois_data, force=force)
 
         excel_path = None
         excel_df = None
