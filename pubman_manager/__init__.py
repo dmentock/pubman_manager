@@ -33,8 +33,8 @@ from .util import *
 from .excel_generator import create_sheet, Cell
 from .pubman_base import PubmanBase
 from .pubman_creator import PubmanCreator
-from .main import generate_author_overview, generate_doi_overview, load_user_config, save_user_config
 from .pubman_extractor import PubmanExtractor
 from .api_manager_scopus import ScopusManager
 from .api_manager_crossref import CrossrefManager
 from .doi_parser import DOIParser
+from .main import generate_author_overview, generate_doi_overview, load_user_config, save_user_config

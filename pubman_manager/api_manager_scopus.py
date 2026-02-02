@@ -126,16 +126,9 @@ class ScopusManager:
                 logger.error(f"Failed to get response from {author_api_url}: {e}\n\n{traceback.format_exc()}")
             else:
                 if response.status_code == 429 or "QUOTA_EXCEEDED" in response.headers.get("X-ELS-Status", ""):
-                    logger.warning(f"Quota exceeded for Scopus author {author_id} (status code: {response.status_code})")
-                    reset_hdr = response.headers.get("X-RateLimit-Reset")
-                    if reset_hdr:
-                        try:
-                            wait = int(reset_hdr) - int(time.time()) + 1  # +1s buffer
-                            raise RuntimeError(f"Rate limit resets in {wait} seconds")
-                        except Exception as e:
-                            raise RuntimeError(f"Failed to parse X-RateLimit-Reset: {reset_hdr} ({e})")
-                    else:
-                        logger.info("No X-RateLimit-Reset header found. Sleeping default 30s.")
+                    raise RuntimeError(
+                        f"Quota exceeded for Scopus author {author_id} (status code: {response.status_code})"
+                    )
                 else:
                     logger.error(f"Failed to retrieve Scopus author data for author {author_id} "
                                 f"(status code: {response.status_code}, {response.text})")
