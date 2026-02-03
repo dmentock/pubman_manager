@@ -394,6 +394,9 @@ class DOIParser:
                 continue
 
             title = html.unescape(unidecode(clean_html(crossref_metadata.get('title', [None])[0])))
+            if self.has_pubman_entry(doi, title=title):
+                logger.info(f'Skipping {doi}, already exists in PuRe')
+                continue
             license_list = crossref_metadata.get('license')
             license_url = license_list[-1].get('URL', '') if license_list else None
             license_year = license_list[-1].get('start', {}).get('date-parts', [[None]])[0][0] if license_list else None

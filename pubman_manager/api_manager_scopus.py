@@ -6,7 +6,9 @@ from typing import List, Dict, Tuple, Any
 import logging
 from urllib.parse import urlencode
 
-from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, is_mpi_affiliation
+import yaml
+
+from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, PUBMAN_CACHE_DIR, is_mpi_affiliation
 from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
@@ -23,8 +25,20 @@ class ScopusManager:
         self.metadata_map = {}
         self.af_id_ = None
         self.author_id_map = {}
+        self.author_name_cache_path = PUBMAN_CACHE_DIR / "scopus_author_names.yaml"
+        self.author_name_cache = self._load_author_name_cache()
         self.last_request = time.time()
         self.rate_limit = 2
+
+    def _load_author_name_cache(self) -> Dict[str, Dict[str, str]]:
+        if not self.author_name_cache_path.exists():
+            return {}
+        with self.author_name_cache_path.open("r", encoding="utf-8") as fh:
+            return yaml.safe_load(fh) or {}
+
+    def _save_author_name_cache(self) -> None:
+        with self.author_name_cache_path.open("w", encoding="utf-8") as fh:
+            yaml.safe_dump(self.author_name_cache, fh, sort_keys=False)
 
     @property
     def af_id(self):
@@ -100,6 +114,9 @@ class ScopusManager:
         return overview
 
     def get_author_full_name(self, author_id):
+        cached = self.author_name_cache.get(author_id)
+        if cached:
+            return cached.get("first", ""), cached.get("last", "")
         author_api_url = f"https://api.elsevier.com/content/author/author_id/{author_id}"
         headers = {
             'Accept': 'application/json',
@@ -120,6 +137,8 @@ class ScopusManager:
                                 if len(variant_name:=variant.get('given-name', '')) > len(first_name):
                                     first_name = variant_name
                                     break
+                    self.author_name_cache[author_id] = {"first": first_name, "last": preferred_name.get('surname', '')}
+                    self._save_author_name_cache()
                     return first_name, preferred_name.get('surname', '')
             except Exception as e:
                 import traceback
@@ -241,7 +260,12 @@ class ScopusManager:
                     auid = url.rsplit('/', 1)[-1] if '/' in url else ""
                 try:
                     if auid:
-                        first, last = self.get_author_full_name(auid)
+                        cached = self.author_name_cache.get(auid)
+                        if cached:
+                            first = cached.get("first", first)
+                            last = cached.get("last", last)
+                        else:
+                            first, last = self.get_author_full_name(auid)
                 except Exception:  # be defensive; don't fail the whole mapping
                     pass
 

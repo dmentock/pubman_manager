@@ -5,11 +5,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
 
+import re
 import yaml
 
 from .doi_parser import DOIParser
 from .pubman_creator import PubmanCreator
-from . import PUBLICATIONS_DIR
+from . import PUBLICATIONS_DIR, FILES_DIR
 
 
 @dataclass(frozen=True)
@@ -21,7 +22,10 @@ class AuthorName:
 
 def load_user_config(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+        data = yaml.safe_load(fh)
+    if isinstance(data, list):
+        return {"tracked_authors": data}
+    return data or {}
 
 
 def save_user_config(path: Path, data: dict) -> None:
@@ -44,6 +48,20 @@ def _default_output_path(prefix: str) -> Path:
     stamp = datetime.now().strftime("%d.%m.%Y_%H_%M_%S")
     return PUBLICATIONS_DIR / "new" / f"{prefix}_{stamp}.xlsx"
 
+def _cache_path_for_user(user_yaml_path: Path) -> Path:
+    cache_dir = user_yaml_path.parent.parent / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / user_yaml_path.name
+
+def _load_doi_cache(cache_path: Path) -> dict:
+    if not cache_path.exists():
+        return {}
+    with cache_path.open("r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+def _save_doi_cache(cache_path: Path, data: dict) -> None:
+    with cache_path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False)
 
 def generate_author_overview(
     user_yaml_path: Path,
@@ -53,18 +71,23 @@ def generate_author_overview(
     force: bool = False,
 ) -> Path:
     user_data = load_user_config(user_yaml_path)
-    tracked_authors = user_data.get("tracked_authors", [])
-    processed_dois_by_author = user_data.get("processed_dois_by_author", {})
+    tracked_authors = user_data.get("tracked_authors", []) if isinstance(user_data, dict) else []
+    cache_path = _cache_path_for_user(user_yaml_path)
+    cache_data = _load_doi_cache(cache_path)
+    cached_dois = set()
+    if not force:
+        for entry in cache_data.values():
+            if isinstance(entry, list):
+                cached_dois.update(entry)
 
     pubman_api = PubmanCreator()
     doi_parser = DOIParser(pubman_api)
 
     final_overview: list = []
+    collected_dois: set[str] = set()
     for author_entry in tracked_authors:
         author = normalize_author(author_entry)
-        processed_for_author = set()
-        if not force:
-            processed_for_author = set(processed_dois_by_author.get(author.display, []))
+        processed_for_author = set(cached_dois)
         dois_crossref, dois_scopus = doi_parser.get_dois_for_author(
             f"{author.first} {author.last}",
             pubyear_start=pubyear_start,
@@ -72,17 +95,24 @@ def generate_author_overview(
             split=True,
         )
         new_dois = set(dois_crossref + dois_scopus)
+        collected_dois.update(new_dois)
         dois_data = doi_parser.collect_data_for_dois(
             dois_crossref,
             dois_scopus,
         )
-        processed_dois_by_author[author.display] = sorted(processed_for_author.union(new_dois))
         if dois_data is not None:
             table_overview = doi_parser.process_dois(dois_data)
             final_overview.extend(table_overview)
 
-    user_data["processed_dois_by_author"] = processed_dois_by_author
+    if collected_dois:
+        cache_key = datetime.now().strftime("%Y-%m-%d")
+        existing = cache_data.get(cache_key, [])
+        merged = list(dict.fromkeys((existing or []) + sorted(collected_dois)))
+        cache_data[cache_key] = merged
+        _save_doi_cache(cache_path, cache_data)
     if update_user_yaml:
+        if "processed_dois_by_author" in user_data:
+            user_data.pop("processed_dois_by_author", None)
         save_user_config(user_yaml_path, user_data)
 
     output_path = output_path or _default_output_path("full_overview")
@@ -107,3 +137,41 @@ def generate_doi_overview(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doi_parser.write_dois_data(output_path, table_overview)
     return output_path
+
+
+def upload_publication_pdfs(
+    file_paths: Iterable[Path],
+    max_size_mb: int = 50,
+) -> list[Path]:
+    max_size_bytes = max_size_mb * 1024 * 1024
+    copied: list[Path] = []
+    errors: list[str] = []
+
+    for file_path in file_paths:
+        path = Path(file_path)
+        if not path.exists() or not path.is_file():
+            errors.append(f"Missing file: {path}")
+            continue
+        if path.suffix.lower() != ".pdf":
+            errors.append(f"Not a PDF: {path.name}")
+            continue
+        size = path.stat().st_size
+        if size > max_size_bytes:
+            errors.append(f"File too large ({size} bytes): {path.name}")
+            continue
+        doi_stub = path.stem
+        if "/" in doi_stub or not doi_stub.startswith("10."):
+            errors.append(f"Invalid DOI filename: {path.name}")
+            continue
+        if not re.match(r"^10\.[0-9]{4,9}[A-Za-z0-9.()_-]+$", doi_stub):
+            errors.append(f"Invalid DOI filename: {path.name}")
+            continue
+        dest = FILES_DIR / path.name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.exists():
+            dest.write_bytes(path.read_bytes())
+        copied.append(dest)
+
+    if errors:
+        raise ValueError("Upload failed:\n" + "\n".join(errors))
+    return copied
