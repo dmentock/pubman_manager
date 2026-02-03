@@ -37,4 +37,4 @@ from .pubman_extractor import PubmanExtractor
 from .api_manager_scopus import ScopusManager
 from .api_manager_crossref import CrossrefManager
 from .doi_parser import DOIParser
-from .main import generate_author_overview, generate_doi_overview, load_user_config, save_user_config, upload_publication_pdfs
+from .main import generate_author_overview, generate_doi_overview, load_user_config, save_user_config, upload_publication_pdfs, refresh_pubman_cache, refresh_pubman_cache_for_user

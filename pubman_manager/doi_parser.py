@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple, Iterable, Optional
 
 from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
-from pubman_manager.util import date_to_cell, load_yaml
+from pubman_manager.util import date_to_cell, load_yaml, normalize_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,8 @@ class DOIParser:
         self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key)
 
         self.pubman_api = pubman_api
-        raw_authors_info = load_yaml(PUBMAN_CACHE_DIR / 'authors_info.yaml')
+        cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(pubman_api.user_id)}"
+        raw_authors_info = load_yaml(cache_dir / 'authors_info.yaml')
         self.authors_affiliation_counters = {
             author: Counter(info["affiliation_counts"])
             for author, info in raw_authors_info.items()

@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from pubman_manager.main import generate_author_overview, generate_doi_overview
+from pubman_manager import USER_DATA_DIR
+from pubman_manager.main import generate_author_overview, generate_doi_overview, upload_publication_pdfs, refresh_pubman_cache
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -11,7 +12,9 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     author_parser = subparsers.add_parser("author-overview", help="Generate overview for tracked authors")
-    author_parser.add_argument("--user-yaml", required=True, type=Path, help="Path to user yaml config")
+    user_group = author_parser.add_mutually_exclusive_group(required=True)
+    user_group.add_argument("--user-yaml", type=Path, help="Path to user yaml config")
+    user_group.add_argument("--user-id", type=str, help="User id (e.g. 3523285)")
     author_parser.add_argument("--pubyear-start", type=int, default=2019)
     author_parser.add_argument("--output", type=Path, default=None)
     author_parser.add_argument("--no-update-user-yaml", action="store_true")
@@ -22,6 +25,15 @@ def _build_parser() -> argparse.ArgumentParser:
     doi_parser.add_argument("--output", type=Path, default=None)
     doi_parser.add_argument("--force", action="store_true")
 
+    upload_parser = subparsers.add_parser("upload-pdfs", help="Upload publication PDFs into .files")
+    upload_parser.add_argument("--file", action="append", dest="files", type=Path, default=[])
+    upload_parser.add_argument("--dir", dest="dirs", action="append", type=Path, default=[])
+
+    cache_parser = subparsers.add_parser("refresh-cache", help="Refresh Pubman cache data for orgs in user yaml")
+    cache_group = cache_parser.add_mutually_exclusive_group(required=True)
+    cache_group.add_argument("--user-yaml", type=Path, help="Path to user yaml config")
+    cache_group.add_argument("--user-id", type=str, help="User id (e.g. 3523285)")
+
     return parser
 
 
@@ -30,8 +42,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "author-overview":
+        user_yaml_path = args.user_yaml
+        if args.user_id:
+            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}.yaml"
         generate_author_overview(
-            user_yaml_path=args.user_yaml,
+            user_yaml_path=user_yaml_path,
             pubyear_start=args.pubyear_start,
             output_path=args.output,
             update_user_yaml=not args.no_update_user_yaml,
@@ -45,6 +60,19 @@ def main(argv: list[str] | None = None) -> int:
             output_path=args.output,
             force=args.force,
         )
+        return 0
+    if args.command == "upload-pdfs":
+        files = list(args.files or [])
+        for directory in args.dirs or []:
+            if directory.exists():
+                files.extend(directory.glob("*.pdf"))
+        upload_publication_pdfs(files)
+        return 0
+    if args.command == "refresh-cache":
+        user_yaml_path = args.user_yaml
+        if args.user_id:
+            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}.yaml"
+        refresh_pubman_cache(user_yaml_path)
         return 0
 
     parser.error("Unknown command")

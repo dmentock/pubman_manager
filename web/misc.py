@@ -11,18 +11,30 @@ from email.mime.base import MIMEBase
 from email import encoders
 import logging
 
-from pubman_manager import PubmanBase, PubmanExtractor, DOIParser, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR
+from pubman_manager import PubmanBase, PubmanExtractor, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR, USER_DATA_DIR
+from pubman_manager import generate_doi_overview, refresh_pubman_cache_for_user
+from pubman_manager.util import normalize_user_id
 
 logger = logging.getLogger(__name__)
 
-extractor = PubmanExtractor()
+extractor = None
 
-def update_cache(org_id):
-    extractor.extract_org_data(org_id)
-    with open(PUBMAN_CACHE_DIR / 'authors_info.yaml', 'r', encoding='utf-8') as f:
+def update_cache(user_id, org_ids):
+    global extractor
+    if extractor is None:
+        extractor = PubmanExtractor()
+    refresh_pubman_cache_for_user(user_id, org_ids)
+    cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(user_id)}"
+    with open(cache_dir / 'authors_info.yaml', 'r', encoding='utf-8') as f:
         authors_info = yaml.load(f, Loader=yaml.FullLoader)
-    names_affiliations = OrderedDict({key: val['affiliations'] for key, val in authors_info.items() if val})
-    file_path = TALKS_DIR / f"Template_Talks_{org_id}.xlsx"
+    names_affiliations = OrderedDict()
+    for key, val in (authors_info or {}).items():
+        if not val:
+            continue
+        counts = val.get("affiliation_counts") if isinstance(val, dict) else None
+        if isinstance(counts, dict):
+            names_affiliations[key] = counts
+    file_path = TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx"
     n_authors = 80
     column_details = OrderedDict([
         ('Event Name', [35, '']),
@@ -35,40 +47,62 @@ def update_cache(org_id):
         ('Talk Title', [50, '']),
         ('Comment (Optional)', [25, '']),
     ])
-    create_sheet(file_path, names_affiliations, column_details, n_authors, n_entries=45)
+    create_sheet(file_path, names_affiliations, column_details, n_authors, "Event Name", n_entries=45)
 
 def get_file_for_dois(dois, doi_parser):
-    df_dois_overview = doi_parser.filter_dois(dois)
-    dois_data = doi_parser.collect_data_for_dois(df_dois_overview, force=True)
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-    doi_parser.write_dois_data(temp_file.name, dois_data)
+    generate_doi_overview(dois, output_path=Path(temp_file.name))
     return temp_file.name
 
 def parse_new_publications(doi_parser):
-    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
-        users = yaml.safe_load(f)
-
     author_publications = {}
     dois_by_user = {}
-    for user in users:
-        dois_by_user[user] = get_user_dois(doi_parser, author_publications=author_publications)
+    for user_yaml_path in USER_DATA_DIR.glob("user_*.yaml"):
+        user_id = user_yaml_path.stem.replace("user_", "")
+        dois_by_user[user_id] = get_user_dois(user_id, doi_parser, author_publications=author_publications)
 
-def get_user_dois(user_id, doi_parser, author_publications=None):
-    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
-        users = yaml.safe_load(f)
+def get_user_dois(user_id, doi_parser, author_publications=None, force: bool = False):
     if author_publications is None:
         author_publications = {}
     new_dois = set()
-    for tracked_author in users[user_id]['tracked_authors']:
+    user_yaml_path = USER_DATA_DIR / f"user_{user_id}.yaml"
+    if not user_yaml_path.exists():
+        return new_dois
+    with user_yaml_path.open("r", encoding="utf-8") as f:
+        user_data = yaml.safe_load(f) or []
+    if isinstance(user_data, dict):
+        tracked_authors = user_data.get("tracked_authors", [])
+    else:
+        tracked_authors = user_data
+    ignored_path = USER_DATA_DIR / f"user_{user_id}_ignored_dois.yaml"
+    if ignored_path.exists():
+        with ignored_path.open("r", encoding="utf-8") as f:
+            ignored_dois = set(yaml.safe_load(f) or [])
+    else:
+        ignored_dois = set()
+    cache_path = USER_DATA_DIR.parent / ".cache" / f"user_{user_id}.yaml"
+    cached_dois = set()
+    if cache_path.exists() and not force:
+        with cache_path.open("r", encoding="utf-8") as f:
+            cache_data = yaml.safe_load(f) or {}
+        for entry in cache_data.values():
+            if isinstance(entry, list):
+                cached_dois.update(entry)
+
+    for tracked_author in tracked_authors:
         if tracked_author not in author_publications:
-            author_publications[tracked_author] = doi_parser.get_dois_for_author(tracked_author, pubyear_start=2024)
+            author_publications[tracked_author] = doi_parser.get_dois_for_author(
+                tracked_author,
+                pubyear_start=2024,
+                processed_dois=cached_dois if not force else None,
+            )
         df = author_publications[tracked_author]
         if df.empty:
             logger.warning(f"No data found for author {tracked_author}. Skipping...")
             continue
         new_dois.update(
             df.loc[
-                ~df['DOI'].isin(users[user_id].get('ignored_dois', [])) &
+                ~df['DOI'].isin(ignored_dois) &
                 (df['Field'].isnull() | (df['Field'] == "")), 'DOI'].tolist()
         )
     return new_dois
@@ -123,18 +157,24 @@ def send_publications():
     pass
 
 def run_periodic_task():
-    with open(Path(__file__).parent / 'users.yaml', 'r') as f:
-        users = yaml.safe_load(f)
-    for org_id in {users[user_id]['org_id'] for user_id in users.keys()}:
-        update_cache(org_id)
+    for user_yaml_path in USER_DATA_DIR.glob("user_*.yaml"):
+        user_id = user_yaml_path.stem.replace("user_", "")
+        with user_yaml_path.open("r", encoding="utf-8") as f:
+            user_info = yaml.safe_load(f) or {}
+        if not isinstance(user_info, dict):
+            continue
+        org_ids = user_info.get("department_org_ids", [])
+        if org_ids:
+            update_cache(user_id, org_ids)
 
-    for user_id, user_info in users.items():
         pubman_api = PubmanBase()
         parser = DOIParser(pubman_api)
         new_publication_dois = get_user_dois(user_id, parser)
         if new_publication_dois:
             logging.info(f'Processing new DOIS for user {user_id} ({user_info}):')
             logging.info(f'{new_publication_dois}')
-            send_author_publications(new_publication_dois, user_info['email'], parser)
+            email = user_info.get("email")
+            if email:
+                send_author_publications(new_publication_dois, email, parser)
         else:
-            logging.info(f"No new DOIS for user {user_info['email']} (tracking {user_info['tracked_authors']})")
+            logging.info(f"No new DOIS for user {user_id} (tracking {user_info.get('tracked_authors', [])})")

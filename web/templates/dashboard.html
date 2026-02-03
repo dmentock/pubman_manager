@@ -10,7 +10,20 @@
 
 <h2>Dashboard</h2>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+    <!-- PuRe Data Section -->
+    <div>
+        <h2>PuRe Data</h2>
+        <p>Department org IDs (one per line):</p>
+        <form method="post" action="{{ url_for('set_department_org_ids') }}">
+          <textarea name="department_org_ids" rows="10" cols="30" placeholder="ou_1863336">{{ department_org_ids }}</textarea><br><br>
+          <button type="submit">Save</button>
+        </form>
+        <form method="post" action="{{ url_for('update_pure_data') }}">
+          <button type="submit">Update PuRe Data</button>
+        </form>
+        <p>Cache last modified: {{ cache_last_modified }}</p>
+    </div>
     <!-- Publications Section -->
     <div>
         <h2>Publications</h2>
@@ -20,14 +33,14 @@
             <input type="file" name="pub_file" accept=".xlsx" required><br><br>
             <input type="submit" value="Upload and Create Publications">
         </form>
-
+<!--
         <h3>Parse DOIs and Download Excel</h3>
         <form method="post" action="{{ url_for('download_publications_excel') }}" enctype="multipart/form-data" onsubmit="showLoading()">
             <textarea name="dois" rows="10" cols="50" placeholder="Enter DOIs, one per line"></textarea><br><br>
             <input type="submit" value="Process DOIs and Download">
         </form>
 
-        <div id="loading" style="display:none;">Loading...</div>
+        <div id="loading" style="display:none;">Loading...</div> -->
 
         <h3>Tracked Authors</h3>
         <p>Receive regular updates of new publications by these authors:</p>
@@ -37,6 +50,12 @@
         <p>Set author list:</p>
         <form method="post" action="{{ url_for('set_or_send_tracked_authors') }}">
           <textarea name="tracked_authors" rows="10" cols="50" placeholder="Enter <first_name last_name>, one per line">{{ tracked_authors }}</textarea><br><br>
+          <label for="send_mode">Send mode:</label>
+          <select name="send_mode" id="send_mode">
+            <option value="new" selected>Only send new publications</option>
+            <option value="all">Send all publications</option>
+          </select>
+          <br><br>
           <button type="submit" name="action" value="save">Save</button>
           <button type="submit" name="action" value="send">Send new publications now</button>
         </form>

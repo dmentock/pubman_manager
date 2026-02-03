@@ -26,6 +26,10 @@ def save_yaml(data, file_path):
     with path.open("w", encoding="utf-8") as fh:
         yaml_obj.dump(data, fh)
 
+def normalize_user_id(user_id) -> str:
+    user_id_str = str(user_id) if user_id is not None else ""
+    return user_id_str.replace("user_", "", 1) if user_id_str.startswith("user_") else user_id_str
+
 def date_to_cell(date_value):
     if not date_value:
         return None

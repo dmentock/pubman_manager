@@ -8,9 +8,11 @@ from typing import Iterable, Optional, Tuple
 import re
 import yaml
 
+from .pubman_extractor import PubmanExtractor
 from .doi_parser import DOIParser
 from .pubman_creator import PubmanCreator
-from . import PUBLICATIONS_DIR, FILES_DIR
+from . import PUBLICATIONS_DIR, FILES_DIR, PUBMAN_CACHE_DIR
+from .util import save_yaml, normalize_user_id
 
 
 @dataclass(frozen=True)
@@ -137,6 +139,37 @@ def generate_doi_overview(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doi_parser.write_dois_data(output_path, table_overview)
     return output_path
+
+
+def refresh_pubman_cache_for_user(user_id: str, org_ids: Iterable[str]) -> Path:
+    org_ids = list(dict.fromkeys(org_ids))
+    if not org_ids:
+        raise ValueError("department_org_ids missing in user yaml.")
+
+    pubman_api = PubmanExtractor()
+    mpg_department_ids_by_name = pubman_api.fetch_all_organizations()
+
+    publications = []
+    for org_id in org_ids:
+        publications.extend(pubman_api.search_publications_by_organization(org_id, size=200000))
+
+    cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(user_id)}"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    save_yaml(mpg_department_ids_by_name, cache_dir / "mpg_departments.yaml")
+    save_yaml(publications, cache_dir / "publications.yaml")
+    save_yaml(pubman_api.extract_authors_info(publications), cache_dir / "authors_info.yaml")
+    save_yaml(pubman_api.extract_organization_mapping(publications), cache_dir / "identifier_paths.yaml")
+    save_yaml(pubman_api.extract_journals(publications), cache_dir / "journals.yaml")
+    return cache_dir
+
+
+def refresh_pubman_cache(user_yaml_path: Path) -> Path:
+    user_data = load_user_config(user_yaml_path)
+    if not isinstance(user_data, dict):
+        raise ValueError("User yaml must be a dict with department_org_ids.")
+    org_ids = user_data.get("department_org_ids", [])
+    user_id = normalize_user_id(user_yaml_path.stem.replace("user_", "", 1))
+    return refresh_pubman_cache_for_user(user_id, org_ids)
 
 
 def upload_publication_pdfs(

@@ -12,7 +12,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR, FILES_DIR
-from pubman_manager.util import is_mpi_affiliation, load_yaml
+from pubman_manager.util import is_mpi_affiliation, load_yaml, normalize_user_id
 
 
 logger = logging.getLogger(__name__)
@@ -29,9 +29,10 @@ class PubmanCreator(PubmanBase):
     def __init__(self, base_url="https://pure.mpg.de/rest", auth_token=None, user_id=None):
         super().__init__(auth_token=auth_token, user_id=user_id, base_url=base_url)
 
-        self.identifier_paths = load_yaml(PUBMAN_CACHE_DIR / 'identifier_paths.yaml')
-        self.authors_info = load_yaml(PUBMAN_CACHE_DIR / 'authors_info.yaml')
-        self.journals = load_yaml(PUBMAN_CACHE_DIR / 'journals.yaml')
+        cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(self.user_id)}"
+        self.identifier_paths = load_yaml(cache_dir / 'identifier_paths.yaml')
+        self.authors_info = load_yaml(cache_dir / 'authors_info.yaml')
+        self.journals = load_yaml(cache_dir / 'journals.yaml')
 
 
     @staticmethod

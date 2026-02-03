@@ -4,21 +4,23 @@ import json
 from fuzzywuzzy import fuzz, process
 from collections import Counter, defaultdict
 from pathlib import Path
-from pubman_manager.util import save_yaml, load_yaml
+from pubman_manager.util import save_yaml, load_yaml, normalize_user_id
 
 class PubmanExtractor(PubmanBase):
 
-    def extract_org_data(self, org_id):
-        (PUBMAN_CACHE_DIR / org_id).mkdir(parents=True, exist_ok=True)
+    def extract_org_data(self, org_id, cache_dir: Path | None = None):
+        if cache_dir is None:
+            cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(self.user_id)}"
+        cache_dir.mkdir(parents=True, exist_ok=True)
         publications = []
         org_publications = self.search_publications_by_organization(org_id, size=200000)
         publications.extend(org_publications)
-        save_yaml(publications, PUBMAN_CACHE_DIR / "publications.yaml")
+        save_yaml(publications, cache_dir / "publications.yaml")
         authors_info = self.extract_authors_info(publications)
-        save_yaml(authors_info, PUBMAN_CACHE_DIR / "authors_info.yaml")
-        save_yaml(self.extract_organization_mapping(publications), PUBMAN_CACHE_DIR / "identifier_paths.yaml")
+        save_yaml(authors_info, cache_dir / "authors_info.yaml")
+        save_yaml(self.extract_organization_mapping(publications), cache_dir / "identifier_paths.yaml")
         journals = self.extract_journals(publications)
-        save_yaml(journals, PUBMAN_CACHE_DIR / "journals.yaml")
+        save_yaml(journals, cache_dir / "journals.yaml")
 
     def extract_organization_mapping(self, data):
         organizations = {}
@@ -223,7 +225,11 @@ class PubmanExtractor(PubmanBase):
         if response.status_code != 200:
             raise Exception("Failed to search for publications", response.status_code)
         results = response.json()
-        items = results.get('records', {})
+        items = results.get('records', [])
+        if isinstance(items, dict):
+            items = items.get('hits', {}).get('hits', []) or []
+        elif not isinstance(items, list):
+            items = list(items)
         scroll_id = results.get('scrollId')
         while scroll_id:
             scroll_response = self.fetch_scroll_results(scroll_id)
