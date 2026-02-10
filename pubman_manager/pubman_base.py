@@ -7,7 +7,7 @@ import jwt
 from collections import OrderedDict
 from pathlib import Path
 
-from pubman_manager import ENV_USERNAME, ENV_PASSWORD
+from pubman_manager import ENV_USERNAME, ENV_PASSWORD, ENV_USERID
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,11 @@ class PubmanBase:
         else:
             logger.info('No auth_token provided, using ENV_USERNAME and ENV_PASSWORD')
             self.auth_token, self.user_id, = self.login(ENV_USERNAME, ENV_PASSWORD)
+            if not self.user_id and ENV_USERID:
+                logger.warning('No user_id from auth; using ENV_USERID')
+                self.user_id = ENV_USERID
+            elif not self.user_id:
+                logger.warning('No user_id resolved; set ENV_USERID to avoid cache path issues')
 
         self.headers = {"Authorization": self.auth_token}
         self.headers_json = {

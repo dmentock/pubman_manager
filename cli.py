@@ -19,6 +19,7 @@ def _build_parser() -> argparse.ArgumentParser:
     author_parser.add_argument("--output", type=Path, default=None)
     author_parser.add_argument("--no-update-user-yaml", action="store_true")
     author_parser.add_argument("--force", action="store_true")
+    author_parser.add_argument("--author", action="append", dest="authors", default=[])
 
     doi_parser = subparsers.add_parser("doi-overview", help="Generate overview for explicit DOIs")
     doi_parser.add_argument("--doi", action="append", dest="dois", required=True)
@@ -44,13 +45,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "author-overview":
         user_yaml_path = args.user_yaml
         if args.user_id:
-            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}.yaml"
+            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}" / "metadata.yaml"
         generate_author_overview(
             user_yaml_path=user_yaml_path,
             pubyear_start=args.pubyear_start,
             output_path=args.output,
             update_user_yaml=not args.no_update_user_yaml,
             force=args.force,
+            override_authors=args.authors or None,
         )
         return 0
 
@@ -71,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "refresh-cache":
         user_yaml_path = args.user_yaml
         if args.user_id:
-            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}.yaml"
+            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}" / "metadata.yaml"
         refresh_pubman_cache(user_yaml_path)
         return 0
 

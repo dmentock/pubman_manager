@@ -19,8 +19,8 @@ from dataclasses import dataclass
 
 from typing import List, Dict, Tuple, Iterable, Optional
 
-from pubman_manager import create_sheet, Cell, PUBMAN_CACHE_DIR, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation
-from pubman_manager.util import date_to_cell, load_yaml, normalize_user_id
+from pubman_manager import create_sheet, Cell, ScopusManager, CrossrefManager, FILES_DIR, is_mpi_affiliation, get_user_cache_dir
+from pubman_manager.util import date_to_cell, load_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,15 @@ def find_best_fuzzy_match(proposed: str, candidates: Iterable[str]) -> Tuple[Opt
 class DOIParser:
     def __init__(self, pubman_api, scopus_api_key = None):
         self.crossref_manager = CrossrefManager()
-        self.scopus_manager = ScopusManager(org_name = pubman_api.org_name, api_key=scopus_api_key)
+        cache_path = get_user_cache_dir(pubman_api.user_id) / "scopus_author_names.yaml"
+        self.scopus_manager = ScopusManager(
+            org_name=pubman_api.org_name,
+            api_key=scopus_api_key,
+            author_name_cache_path=cache_path,
+        )
 
         self.pubman_api = pubman_api
-        cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(pubman_api.user_id)}"
+        cache_dir = get_user_cache_dir(pubman_api.user_id)
         raw_authors_info = load_yaml(cache_dir / 'authors_info.yaml')
         self.authors_affiliation_counters = {
             author: Counter(info["affiliation_counts"])

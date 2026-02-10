@@ -11,7 +11,7 @@ import yaml
 from .pubman_extractor import PubmanExtractor
 from .doi_parser import DOIParser
 from .pubman_creator import PubmanCreator
-from . import PUBLICATIONS_DIR, FILES_DIR, PUBMAN_CACHE_DIR
+from . import PUBLICATIONS_DIR, FILES_DIR, get_user_cache_dir
 from .util import save_yaml, normalize_user_id
 
 
@@ -51,9 +51,7 @@ def _default_output_path(prefix: str) -> Path:
     return PUBLICATIONS_DIR / "new" / f"{prefix}_{stamp}.xlsx"
 
 def _cache_path_for_user(user_yaml_path: Path) -> Path:
-    cache_dir = user_yaml_path.parent.parent / ".cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    return cache_dir / user_yaml_path.name
+    return user_yaml_path.parent / "publication_collection_history.yaml"
 
 def _load_doi_cache(cache_path: Path) -> dict:
     if not cache_path.exists():
@@ -71,9 +69,13 @@ def generate_author_overview(
     output_path: Optional[Path] = None,
     update_user_yaml: bool = True,
     force: bool = False,
+    override_authors: Optional[Iterable[str]] = None,
 ) -> Path:
     user_data = load_user_config(user_yaml_path)
-    tracked_authors = user_data.get("tracked_authors", []) if isinstance(user_data, dict) else []
+    if override_authors is not None:
+        tracked_authors = list(override_authors)
+    else:
+        tracked_authors = user_data.get("tracked_authors", []) if isinstance(user_data, dict) else []
     cache_path = _cache_path_for_user(user_yaml_path)
     cache_data = _load_doi_cache(cache_path)
     cached_dois = set()
@@ -158,7 +160,7 @@ def refresh_pubman_cache_for_user(user_id: str, org_ids: Iterable[str]) -> Path:
     for org_id in org_ids:
         publications.extend(pubman_api.search_publications_by_organization(org_id, size=200000))
 
-    cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(user_id)}"
+    cache_dir = get_user_cache_dir(user_id)
     cache_dir.mkdir(parents=True, exist_ok=True)
     save_yaml(mpg_department_ids_by_name, cache_dir / "mpg_departments.yaml")
     save_yaml(publications, cache_dir / "publications.yaml")

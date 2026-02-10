@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import yaml
 
-from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, PUBMAN_CACHE_DIR, is_mpi_affiliation
+from pubman_manager import FILES_DIR, ENV_SCOPUS_API_KEY, USER_DATA_DIR, is_mpi_affiliation
 from pubman_manager.util import date_to_cell
 
 logger = logging.getLogger(__name__)
@@ -19,13 +19,13 @@ BASE_AFFILIATION_URL = f"{BASE_URL}/search/affiliation"
 BASE_SEARCH_URL = "https://api.elsevier.com/content/search/scopus"
 
 class ScopusManager:
-    def __init__(self, org_name, api_key = None):
+    def __init__(self, org_name, api_key = None, author_name_cache_path=None):
         self.api_key = api_key if api_key else ENV_SCOPUS_API_KEY
         self.org_name = org_name
         self.metadata_map = {}
         self.af_id_ = None
         self.author_id_map = {}
-        self.author_name_cache_path = PUBMAN_CACHE_DIR / "scopus_author_names.yaml"
+        self.author_name_cache_path = author_name_cache_path or (USER_DATA_DIR / "scopus_author_names.yaml")
         self.author_name_cache = self._load_author_name_cache()
         self.last_request = time.time()
         self.rate_limit = 2

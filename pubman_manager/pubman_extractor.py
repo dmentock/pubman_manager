@@ -1,16 +1,16 @@
-from pubman_manager import PubmanBase, PUBMAN_CACHE_DIR
+from pubman_manager import PubmanBase, get_user_cache_dir
 import requests
 import json
 from fuzzywuzzy import fuzz, process
 from collections import Counter, defaultdict
 from pathlib import Path
-from pubman_manager.util import save_yaml, load_yaml, normalize_user_id
+from pubman_manager.util import save_yaml, load_yaml
 
 class PubmanExtractor(PubmanBase):
 
     def extract_org_data(self, org_id, cache_dir: Path | None = None):
         if cache_dir is None:
-            cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(self.user_id)}"
+            cache_dir = get_user_cache_dir(self.user_id)
         cache_dir.mkdir(parents=True, exist_ok=True)
         publications = []
         org_publications = self.search_publications_by_organization(org_id, size=200000)
@@ -96,12 +96,19 @@ class PubmanExtractor(PubmanBase):
                 reduced.append(s.strip())
         ein_suffix = "Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"
         sus_suffix = "Max Planck Institute for Sustainable Materials, Max Planck Society"
-        has_ein = any(aff.endswith(ein_suffix) for aff in reduced)
-        has_sus = any(aff.endswith(sus_suffix) for aff in reduced)
-        if has_ein and not has_sus:
-            reduced.append(sus_suffix)
-        if has_sus and not has_ein:
-            reduced.append(ein_suffix)
+        additions = []
+        for aff in reduced:
+            if aff.endswith(ein_suffix):
+                prefix = aff[: -len(ein_suffix)].rstrip().rstrip(",")
+                swapped = f"{prefix}, {sus_suffix}" if prefix else sus_suffix
+                additions.append(swapped)
+            elif aff.endswith(sus_suffix):
+                prefix = aff[: -len(sus_suffix)].rstrip().rstrip(",")
+                swapped = f"{prefix}, {ein_suffix}" if prefix else ein_suffix
+                additions.append(swapped)
+        for aff in additions:
+            if aff not in reduced:
+                reduced.append(aff)
         return reduced
 
     def extract_authors_info(self, publications):
