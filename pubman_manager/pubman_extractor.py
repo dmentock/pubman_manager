@@ -94,6 +94,14 @@ class PubmanExtractor(PubmanBase):
                     break
             if not found:
                 reduced.append(s.strip())
+        ein_suffix = "Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"
+        sus_suffix = "Max Planck Institute for Sustainable Materials, Max Planck Society"
+        has_ein = any(aff.endswith(ein_suffix) for aff in reduced)
+        has_sus = any(aff.endswith(sus_suffix) for aff in reduced)
+        if has_ein and not has_sus:
+            reduced.append(sus_suffix)
+        if has_sus and not has_ein:
+            reduced.append(ein_suffix)
         return reduced
 
     def extract_authors_info(self, publications):

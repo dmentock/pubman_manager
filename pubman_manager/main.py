@@ -147,7 +147,12 @@ def refresh_pubman_cache_for_user(user_id: str, org_ids: Iterable[str]) -> Path:
         raise ValueError("department_org_ids missing in user yaml.")
 
     pubman_api = PubmanExtractor()
-    mpg_department_ids_by_name = pubman_api.fetch_all_organizations()
+    raw_departments = pubman_api.fetch_all_organizations()
+    mpg_department_ids_by_name = {
+        str(k): (str(v) if v is not None else "")
+        for k, v in (raw_departments or {}).items()
+        if k is not None
+    }
 
     publications = []
     for org_id in org_ids:

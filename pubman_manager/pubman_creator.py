@@ -347,10 +347,21 @@ class PubmanCreator(PubmanBase):
 
     def create_talks(self, file_path, create_items=True, submit_items=False, overwrite=False):
         rows = self.extract_prefilled_rows(file_path, header_name="Event Name")
+        example_index = None
+        for idx, row in enumerate(rows):
+            event_name = str(row.get("Event Name", "")).strip().lower()
+            if event_name.startswith("example"):
+                example_index = idx
+                break
+        if example_index is not None:
+            rows = rows[example_index + 1 :]
         request_list = []
 
         for row in rows:
             logger.info(f'Generating requests for "{row.get("Talk Title")}"')
+
+            if not row.get("Talk Title"):
+                continue
 
             row_authors_info = self.get_row_authors_info(row)
 
