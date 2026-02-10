@@ -11,7 +11,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import logging
 
-from pubman_manager import PubmanBase, PubmanExtractor, create_sheet, PUBMAN_CACHE_DIR, TALKS_DIR, USER_DATA_DIR
+from pubman_manager import PubmanBase, PubmanExtractor, create_sheet, TALKS_DIR, USER_DATA_DIR, get_user_cache_dir, get_user_dir
 from pubman_manager import generate_doi_overview, refresh_pubman_cache_for_user
 from pubman_manager.util import normalize_user_id
 
@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 
 extractor = None
 
+def _user_yaml_path(user_id) -> Path:
+    return get_user_dir(user_id) / "metadata.yaml"
+
 def update_cache(user_id, org_ids):
     global extractor
     if extractor is None:
         extractor = PubmanExtractor()
     refresh_pubman_cache_for_user(user_id, org_ids)
-    cache_dir = PUBMAN_CACHE_DIR / f"user_{normalize_user_id(user_id)}"
+    cache_dir = get_user_cache_dir(user_id)
     with open(cache_dir / 'authors_info.yaml', 'r', encoding='utf-8') as f:
         authors_info = yaml.load(f, Loader=yaml.FullLoader)
     names_affiliations = OrderedDict()
@@ -37,6 +40,7 @@ def update_cache(user_id, org_ids):
     file_path = TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx"
     n_authors = 80
     column_details = OrderedDict([
+        ('', [12, '']),
         ('Event Name', [35, '']),
         ('Conference start date\n(dd.mm.YYYY)', [20, '']),
         ('Conference end date\n(dd.mm.YYYY)', [20, '']),
@@ -47,7 +51,40 @@ def update_cache(user_id, org_ids):
         ('Talk Title', [50, '']),
         ('Comment (Optional)', [25, '']),
     ])
-    create_sheet(file_path, names_affiliations, column_details, n_authors, "Event Name", n_entries=45)
+    example_fixed = [
+        "Example: deRSE23 - Conference for Research Software Engineering in Germany",
+        "20.03.2023",
+        "22.03.2023",
+        "21.03.2023",
+        "Paderborn, Germany",
+        "n",
+        "",
+        "DAMASK: Challenges in collaborative development and outlook",
+        "",
+    ]
+    example_names = [
+        ("Daniel Otto de Mentock", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+        ("Sharan Roongta", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+        ("Philip Eisenlohr", "Michigan State University, Chemical Engineering and Materials Science, East Lansing, MI 48824, USA"),
+        ("Martin Diehl", "Department of Computer Science, KU Leuven, Celestijnenlaan 200 A, Leuven 3001, Belgium"),
+        ("Franz Roters", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+    ]
+    example_row = list(example_fixed)
+    for i in range(n_authors):
+        if i < len(example_names):
+            name, affiliation = example_names[i]
+        else:
+            name, affiliation = "", ""
+        example_row.extend([name, affiliation])
+    create_sheet(
+        file_path,
+        names_affiliations,
+        column_details,
+        n_authors,
+        "Event Name",
+        n_entries=45,
+        example_row=example_row,
+    )
 
 def get_file_for_dois(dois, doi_parser):
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
@@ -57,15 +94,15 @@ def get_file_for_dois(dois, doi_parser):
 def parse_new_publications(doi_parser):
     author_publications = {}
     dois_by_user = {}
-    for user_yaml_path in USER_DATA_DIR.glob("user_*.yaml"):
-        user_id = user_yaml_path.stem.replace("user_", "")
+    for user_yaml_path in USER_DATA_DIR.glob("*/metadata.yaml"):
+        user_id = user_yaml_path.parent.name
         dois_by_user[user_id] = get_user_dois(user_id, doi_parser, author_publications=author_publications)
 
 def get_user_dois(user_id, doi_parser, author_publications=None, force: bool = False):
     if author_publications is None:
         author_publications = {}
     new_dois = set()
-    user_yaml_path = USER_DATA_DIR / f"user_{user_id}.yaml"
+    user_yaml_path = _user_yaml_path(user_id)
     if not user_yaml_path.exists():
         return new_dois
     with user_yaml_path.open("r", encoding="utf-8") as f:
@@ -74,13 +111,8 @@ def get_user_dois(user_id, doi_parser, author_publications=None, force: bool = F
         tracked_authors = user_data.get("tracked_authors", [])
     else:
         tracked_authors = user_data
-    ignored_path = USER_DATA_DIR / f"user_{user_id}_ignored_dois.yaml"
-    if ignored_path.exists():
-        with ignored_path.open("r", encoding="utf-8") as f:
-            ignored_dois = set(yaml.safe_load(f) or [])
-    else:
-        ignored_dois = set()
-    cache_path = USER_DATA_DIR.parent / ".cache" / f"user_{user_id}.yaml"
+    ignored_dois = set(user_data.get("ignored_dois", []) if isinstance(user_data, dict) else [])
+    cache_path = get_user_dir(user_id) / "publication_collection_history.yaml"
     cached_dois = set()
     if cache_path.exists() and not force:
         with cache_path.open("r", encoding="utf-8") as f:
@@ -157,8 +189,8 @@ def send_publications():
     pass
 
 def run_periodic_task():
-    for user_yaml_path in USER_DATA_DIR.glob("user_*.yaml"):
-        user_id = user_yaml_path.stem.replace("user_", "")
+    for user_yaml_path in USER_DATA_DIR.glob("*/metadata.yaml"):
+        user_id = user_yaml_path.parent.name
         with user_yaml_path.open("r", encoding="utf-8") as f:
             user_info = yaml.safe_load(f) or {}
         if not isinstance(user_info, dict):

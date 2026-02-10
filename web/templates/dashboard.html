@@ -22,7 +22,7 @@
         <form method="post" action="{{ url_for('update_pure_data') }}">
           <button type="submit">Update PuRe Data</button>
         </form>
-        <p>Cache last modified: {{ cache_last_modified }}</p>
+        <p>Cache last updated: {{ cache_last_modified }}</p>
     </div>
     <!-- Publications Section -->
     <div>
@@ -32,6 +32,11 @@
         <form method="post" action="{{ url_for('create_publications') }}" enctype="multipart/form-data">
             <input type="file" name="pub_file" accept=".xlsx" required><br><br>
             <input type="submit" value="Upload and Create Publications">
+        </form>
+        <h3>Upload Missing PDFs</h3>
+        <form method="post" action="{{ url_for('upload_missing_pdfs') }}" enctype="multipart/form-data">
+            <input type="file" name="pdf_files" accept=".pdf" multiple required><br><br>
+            <input type="submit" value="Upload PDFs">
         </form>
 <!--
         <h3>Parse DOIs and Download Excel</h3>
@@ -56,8 +61,18 @@
             <option value="all">Send all publications</option>
           </select>
           <br><br>
-          <button type="submit" name="action" value="save">Save</button>
-          <button type="submit" name="action" value="send">Send new publications now</button>
+          <button type="submit" name="action" value="save" style="margin-bottom: 10px;">Save</button>
+        </form>
+        <form method="post" action="{{ url_for('trigger_publication_collection') }}" style="margin-bottom: 10px;">
+          <button type="submit">Trigger publication collection</button>
+        </form>
+        <form method="get" action="{{ url_for('download_latest_publication_collection') }}" style="margin-bottom: 20px;">
+          <button type="submit">Download latest publication collection result</button>
+          {% if latest_collection %}
+            <p>Last updated: {{ latest_collection.created_at }} | Rows: {{ latest_collection.rows }}</p>
+          {% else %}
+            <p>No publication collection results yet.</p>
+          {% endif %}
         </form>
         <br>
         <details>
@@ -77,6 +92,7 @@
         <!-- Download Talks Template -->
         <h4>Download Current Talks Template</h4>
         <a href="{{ url_for('download_talks_template_public') }}" target="_blank">Download Talks Template</a>
+        <p>Last updated: {{ talks_last_modified }}</p>
 
 
         <!-- Upload Talks File -->

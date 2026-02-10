@@ -5,6 +5,7 @@ import logging
 import os
 import traceback
 import tempfile
+import re
 from datetime import datetime
 import pandas as pd
 import yaml
@@ -14,7 +15,8 @@ from app import app, login_manager
 from user import User
 
 from misc import update_cache, send_test_mail_, send_author_publications, get_file_for_dois, get_user_dois
-from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, PUBMAN_CACHE_DIR, USER_DATA_DIR
+from pubman_manager import DOIParser, PubmanExtractor, PubmanCreator, TALKS_DIR, USER_DATA_DIR, get_user_cache_dir, get_user_dir, FILES_DIR
+from pubman_manager import generate_author_overview, PubmanCreator
 
 # Initialize your core objects
 # pubman_api = None
@@ -51,7 +53,8 @@ def login():
             org_id = user_info['org_id']
             user_name = user_info['user_name']
             app.logger.info("Login context user_name=%s org_id=%s ctx_id=%s", user_name, org_id, ctx_id)
-            user_yaml_path = USER_DATA_DIR / f"user_{user_id}.yaml"
+            user_yaml_dir = get_user_dir(user_id)
+            user_yaml_path = user_yaml_dir / "metadata.yaml"
             if not user_yaml_path.exists():
                 app.logger.info("User yaml missing, updating cache for org_id %s", org_id)
                 update_cache(user_id, [org_id])
@@ -125,16 +128,27 @@ def create_publications():
         _ensure_pubman_creator()
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         file.save(temp_file.name)
-        pubman_creator.create_publications(temp_file.name, overwrite=True, submit_items=False)
-        flash('Publications created successfully.')
+        summary = pubman_creator.create_publications(temp_file.name, overwrite=True, submit_items=False)
+        if summary["created"] == 0:
+            flash(
+                f"No new publications created. "
+                f"Total rows: {summary['total']}, skipped existing: {summary['skipped_existing']}, "
+                f"blocked existing: {summary['blocked_existing']}."
+            )
+        else:
+            flash(
+                f"Publications created successfully. "
+                f"Created: {summary['created']}, skipped existing: {summary['skipped_existing']}, "
+                f"blocked existing: {summary['blocked_existing']}."
+            )
     except Exception as e:
         flash(f"Error creating publications: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
-def _load_user_dashboard_data(user_id: str) -> tuple[str, str, str, str]:
-    user_yaml_path = USER_DATA_DIR / f"user_{user_id}.yaml"
+def _load_user_dashboard_data(user_id: str) -> tuple[str, str, str, str, str, dict | None]:
+    user_yaml_path = get_user_dir(user_id) / "metadata.yaml"
     if not user_yaml_path.exists():
-        return "", "", "", ""
+        return "", "", "", "", "", None
     with user_yaml_path.open("r", encoding="utf-8") as f:
         user_data = yaml.safe_load(f) or []
     if isinstance(user_data, dict):
@@ -145,19 +159,27 @@ def _load_user_dashboard_data(user_id: str) -> tuple[str, str, str, str]:
         department_org_ids = []
     tracked_authors_str = "\n".join(tracked_authors)
     department_org_ids_str = "\n".join(department_org_ids)
-    ignored_dois_path = USER_DATA_DIR / f"user_{user_id}_ignored_dois.yaml"
-    if ignored_dois_path.exists():
-        with ignored_dois_path.open("r", encoding="utf-8") as f:
-            ignored_dois = yaml.safe_load(f) or []
-    else:
-        ignored_dois = []
+    ignored_dois = user_data.get("ignored_dois", []) if isinstance(user_data, dict) else []
     ignored_dois_str = "\n".join(ignored_dois)
-    cache_dir = PUBMAN_CACHE_DIR / f"user_{user_id}"
-    if cache_dir.exists():
-        last_modified = datetime.fromtimestamp(cache_dir.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    cache_dir = get_user_cache_dir(user_id)
+    authors_info_path = cache_dir / "authors_info.yaml"
+    if authors_info_path.exists():
+        last_modified = datetime.fromtimestamp(authors_info_path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
     else:
         last_modified = "N/A"
-    return tracked_authors_str, ignored_dois_str, department_org_ids_str, last_modified
+    talks_last_modified = "N/A"
+    if department_org_ids:
+        talks_template = TALKS_DIR / f"Template_Talks_{department_org_ids[0]}.xlsx"
+        if talks_template.exists():
+            talks_last_modified = datetime.fromtimestamp(talks_template.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+    latest_collection = None
+    results_meta_path = get_user_dir(user_id) / "publication_collection_results.yaml"
+    if results_meta_path.exists():
+        with results_meta_path.open("r", encoding="utf-8") as f:
+            entries = yaml.safe_load(f) or []
+        if isinstance(entries, list) and entries:
+            latest_collection = entries[-1]
+    return tracked_authors_str, ignored_dois_str, department_org_ids_str, last_modified, talks_last_modified, latest_collection
 
 def _resolve_user_id() -> str:
     raw_id = getattr(current_user, "id", "")
@@ -173,13 +195,15 @@ def _resolve_user_id() -> str:
 @app.route('/dashboard', methods=['GET'])
 @login_required
 def dashboard():
-    tracked_authors_str, ignored_dois_str, department_org_ids_str, cache_last_modified = _load_user_dashboard_data(_resolve_user_id())
+    tracked_authors_str, ignored_dois_str, department_org_ids_str, cache_last_modified, talks_last_modified, latest_collection = _load_user_dashboard_data(_resolve_user_id())
     return render_template(
         'dashboard.html',
         tracked_authors=tracked_authors_str,
         ignored_dois=ignored_dois_str,
         department_org_ids=department_org_ids_str,
         cache_last_modified=cache_last_modified,
+        talks_last_modified=talks_last_modified,
+        latest_collection=latest_collection,
     )
 
 @app.route('/send_test_mail', methods=['POST'])
@@ -200,7 +224,7 @@ def set_or_send_tracked_authors():
     authors = request.form.get('tracked_authors', '').splitlines()
     authors = [author.strip() for author in authors if author.strip()]
     try:
-        user_yaml_path = USER_DATA_DIR / f"user_{_resolve_user_id()}.yaml"
+        user_yaml_path = get_user_dir(_resolve_user_id()) / "metadata.yaml"
         user_yaml_path.parent.mkdir(parents=True, exist_ok=True)
         existing = {}
         if user_yaml_path.exists():
@@ -225,16 +249,128 @@ def set_or_send_tracked_authors():
             flash(f"Error updating and sending new publications: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
+@app.route('/upload_missing_pdfs', methods=['POST'])
+@login_required
+def upload_missing_pdfs():
+    try:
+        files = request.files.getlist('pdf_files')
+        if not files:
+            flash('No PDF files uploaded.')
+            return redirect(url_for('dashboard'))
+        dest_dir = FILES_DIR
+        saved = 0
+        errors = []
+        for f in files:
+            if not f or not f.filename:
+                continue
+            filename = Path(f.filename).name
+            if not filename.lower().endswith('.pdf'):
+                errors.append(f"Not a PDF: {filename}")
+                continue
+            doi_stub = filename[:-4]
+            if not re.match(r"^10\.[0-9]{4,9}[A-Za-z0-9.()_-]+$", doi_stub):
+                errors.append(f"Invalid DOI filename: {filename}")
+                continue
+            dest_path = dest_dir / filename
+            if dest_path.exists():
+                errors.append(f"Already exists: {filename}")
+                continue
+            f.save(dest_path)
+            saved += 1
+        if errors:
+            flash("Upload completed with errors: " + "; ".join(errors))
+        else:
+            flash(f"Uploaded {saved} PDF(s) successfully.")
+    except Exception as e:
+        flash(f"Error uploading PDFs: {traceback.format_exc()}")
+    return redirect(url_for('dashboard'))
+
+@app.route('/trigger_publication_collection', methods=['POST'])
+@login_required
+def trigger_publication_collection():
+    try:
+        user_id = _resolve_user_id()
+        user_dir = get_user_dir(user_id)
+        user_yaml_path = user_dir / "metadata.yaml"
+        if not user_yaml_path.exists():
+            flash('User yaml not found.')
+            return redirect(url_for('dashboard'))
+        results_dir = user_dir / "publication_collection_results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        output_path = results_dir / f"publication_overview_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        generate_author_overview(user_yaml_path=user_yaml_path, output_path=output_path)
+        rows_count = 0
+        try:
+            with output_path.open("rb") as f:
+                rows = PubmanCreator.extract_prefilled_rows(f, header_name="Title")
+                rows_count = len(rows)
+        except Exception:
+            rows_count = 0
+        meta_path = user_dir / "publication_collection_results.yaml"
+        if meta_path.exists():
+            with meta_path.open("r", encoding="utf-8") as f:
+                entries = yaml.safe_load(f) or []
+        else:
+            entries = []
+        entries.append({
+            "filename": output_path.name,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "rows": rows_count,
+        })
+        with meta_path.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(entries, f, sort_keys=False)
+        flash('Publication collection completed.')
+    except Exception as e:
+        flash(f"Error collecting publications: {traceback.format_exc()}")
+    return redirect(url_for('dashboard'))
+
+@app.route('/download_latest_publication_collection', methods=['GET'])
+@login_required
+def download_latest_publication_collection():
+    try:
+        user_id = _resolve_user_id()
+        user_dir = get_user_dir(user_id)
+        meta_path = user_dir / "publication_collection_results.yaml"
+        if not meta_path.exists():
+            flash('No publication collection results found.')
+            return redirect(url_for('dashboard'))
+        with meta_path.open("r", encoding="utf-8") as f:
+            entries = yaml.safe_load(f) or []
+        if not entries:
+            flash('No publication collection results found.')
+            return redirect(url_for('dashboard'))
+        latest = entries[-1]
+        file_path = user_dir / "publication_collection_results" / latest.get("filename", "")
+        if not file_path.exists():
+            flash('Latest publication collection file is missing.')
+            return redirect(url_for('dashboard'))
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=file_path.name,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    except Exception as e:
+        flash(f"Error downloading publication collection: {traceback.format_exc()}")
+    return redirect(url_for('dashboard'))
+
 @app.route('/ignored_dois_str', methods=['POST'])
 @login_required
 def ignored_dois_str():
     ignored_dois = request.form.get('ignored_dois', '').splitlines()
     ignored_dois = [author.strip() for author in ignored_dois if author.strip()]
     try:
-        ignored_dois_path = USER_DATA_DIR / f"user_{_resolve_user_id()}_ignored_dois.yaml"
-        ignored_dois_path.parent.mkdir(parents=True, exist_ok=True)
-        with ignored_dois_path.open("w", encoding="utf-8") as f:
-            yaml.safe_dump(ignored_dois, f)
+        user_yaml_path = get_user_dir(_resolve_user_id()) / "metadata.yaml"
+        user_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+        existing = {}
+        if user_yaml_path.exists():
+            with user_yaml_path.open("r", encoding="utf-8") as f:
+                existing = yaml.safe_load(f) or {}
+        if not isinstance(existing, dict):
+            existing = {}
+        existing["ignored_dois"] = ignored_dois
+        with user_yaml_path.open("w", encoding="utf-8") as f:
+            yaml.safe_dump(existing, f, sort_keys=False)
         flash('DOIS to ignore updated successfully.')
     except Exception as e:
         flash(f"Error saving DOIS to ignore: {traceback.format_exc()}")
@@ -246,7 +382,7 @@ def set_department_org_ids():
     org_ids = request.form.get('department_org_ids', '').splitlines()
     org_ids = [org_id.strip() for org_id in org_ids if org_id.strip()]
     try:
-        user_yaml_path = USER_DATA_DIR / f"user_{_resolve_user_id()}.yaml"
+        user_yaml_path = get_user_dir(_resolve_user_id()) / "metadata.yaml"
         user_yaml_path.parent.mkdir(parents=True, exist_ok=True)
         existing = {}
         if user_yaml_path.exists():
@@ -262,12 +398,13 @@ def set_department_org_ids():
         flash(f"Error saving department org IDs: {traceback.format_exc()}")
     return redirect(url_for('dashboard'))
 
-@app.route('/update_pure_data', methods=['POST'])
+@app.route('/update_pure_data', methods=['GET', 'POST'])
 @login_required
 def update_pure_data():
     try:
         user_id = _resolve_user_id()
-        user_yaml_path = USER_DATA_DIR / f"user_{user_id}.yaml"
+        app.logger.info("Updating PuRe data for user_id=%s", user_id)
+        user_yaml_path = get_user_dir(user_id) / "metadata.yaml"
         if not user_yaml_path.exists():
             flash('User yaml not found.')
             return redirect(url_for('dashboard'))
@@ -318,6 +455,7 @@ def create_talks():
         return redirect(url_for('dashboard'))
 
     try:
+        _ensure_pubman_creator()
         # Save the uploaded file to a temporary location
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1])
         temp_file_path = temp_file.name  # Store the temp file path
@@ -325,8 +463,24 @@ def create_talks():
         file.save(temp_file_path)
 
         # Process the uploaded file to create talks
-        pubman_creator.create_talks(temp_file_path, create_items=True, submit_items=True, overwrite=True)
-        flash(f'Talks created successfully from file: {file.filename}')
+        summary = pubman_creator.create_talks(
+            temp_file_path,
+            create_items=True,
+            submit_items=False,
+            overwrite=True,
+        )
+        if summary["created"] == 0:
+            flash(
+                f"No new talks created. "
+                f"Total rows: {summary['total']}, skipped existing: {summary['skipped_existing']}, "
+                f"blocked existing: {summary['blocked_existing']}."
+            )
+        else:
+            flash(
+                f"Talks created successfully. "
+                f"Created: {summary['created']}, skipped existing: {summary['skipped_existing']}, "
+                f"blocked existing: {summary['blocked_existing']}."
+            )
     except Exception as e:
         error_message = traceback.format_exc()
         flash(f'Error: {error_message}')
