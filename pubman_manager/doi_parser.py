@@ -210,6 +210,13 @@ class DOIParser:
         # Assume that very similar affiliations overlap (see fuzz_threshold)
         canon: list[str] = []
         for _author, res_list in results_by_author.items():
+            pure_affiliations = sorted(
+                self.authors_affiliation_counters.get(_author, {}).keys(),
+                key=lambda x: self.authors_affiliation_counters.get(_author, {}).get(x, 0),
+                reverse=True
+            ) if _author in self.authors_affiliation_counters else []
+            allowed = set(pure_affiliations)
+            allowed.update(res.affiliation for res in res_list if res.affiliation)
             for res in res_list:
                 s = (res.affiliation or "").strip()
                 if not s:
@@ -218,7 +225,7 @@ class DOIParser:
                     canon.append(s)
                     continue
                 match = process.extractOne(s, canon, scorer=fuzz.token_set_ratio)
-                if match and match[1] >= fuzz_threshold:
+                if match and match[1] >= fuzz_threshold and match[0] in allowed:
                     res.affiliation = match[0]
                 else:
                     canon.append(s)

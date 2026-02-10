@@ -350,13 +350,16 @@ class PubmanCreator(PubmanBase):
         rows = self.extract_prefilled_rows(file_path, header_name="Event Name")
         example_index = None
         for idx, row in enumerate(rows):
-            event_name = str(row.get("Event Name", "")).strip().lower()
-            if event_name.startswith("example"):
-                example_index = idx
+            for value in row.values():
+                if isinstance(value, str) and value.strip().casefold() == "example":
+                    example_index = idx
+                    break
+            if example_index is not None:
                 break
         if example_index is not None:
             rows = rows[example_index + 1 :]
         request_list = []
+        missing_pdfs = []
 
         for row in rows:
             logger.info(f'Generating requests for "{row.get("Talk Title")}"')
@@ -432,7 +435,16 @@ class PubmanCreator(PubmanBase):
                 request
             ))
 
-        self.create_items(request_list, create_items=create_items, submit_items=submit_items, overwrite=overwrite)
+        if not request_list:
+            raise RuntimeError("No talk rows found after the example row.")
+
+        summary = self.create_items(
+            request_list,
+            create_items=create_items,
+            submit_items=submit_items,
+            overwrite=overwrite,
+        )
+        return summary
 
     # -------------------------------------------------------------------------
     #  CREATE PUBLICATIONS (now using unified parser)
@@ -441,6 +453,10 @@ class PubmanCreator(PubmanBase):
     def create_publications(self, file_path, submit_items=False, overwrite=False):
         rows = self.extract_prefilled_rows(file_path, header_name="Title")
         request_list = []
+        missing_pdfs = []
+
+        if not rows:
+            raise RuntimeError("No publication rows found in the uploaded file.")
 
         for row in rows:
             title = row.get("Title")
@@ -538,6 +554,7 @@ class PubmanCreator(PubmanBase):
             if license_url:
                 if not pdf_path.exists():
                     logger.error(f'PDF for DOI {doi} not found: {pdf_path}')
+                    missing_pdfs.append(pdf_path.name)
                 else:
                     file_id = self.upload_pdf(pdf_path)
                     file_entry = {
@@ -597,10 +614,19 @@ class PubmanCreator(PubmanBase):
             criteria = {"metadata.identifiers": {"id": doi, "type": "DOI"}}
             request_list.append((criteria, request))
 
-        self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
+        summary = self.create_items(request_list, submit_items=submit_items, overwrite=overwrite)
+        if missing_pdfs:
+            raise RuntimeError(
+                "Could not find PDF(s) for open access publications: "
+                + ", ".join(sorted(set(missing_pdfs)))
+            )
+        return summary
 
     def create_items(self, request_list, create_items=True, submit_items=False, overwrite=False):
         item_ids = []
+        created_count = 0
+        skipped_existing = 0
+        blocked_existing = 0
 
         for criteria, request_json in request_list:
             created_item = None
@@ -617,11 +643,13 @@ class PubmanCreator(PubmanBase):
                             item_already_released = True
                             logger.info(f"Could not delete publication '{title}', skipping")
                     if item_already_released:
+                        blocked_existing += 1
                         continue
                 else:
                     logger.info(f"Skipping existing publication: '{criteria}'")
                     pub = existing[0]['data']
                     item_ids.append((pub['objectId'], pub['lastModificationDate'], pub['versionState']))
+                    skipped_existing += 1
                     continue
 
             if create_items:
@@ -629,6 +657,7 @@ class PubmanCreator(PubmanBase):
                 if created_item:
                     item_ids.append((created_item['objectId'], created_item['lastModificationDate'],
                                      created_item['versionState']))
+                    created_count += 1
 
         if submit_items:
             for obj_id, mod, state in item_ids:
@@ -637,3 +666,9 @@ class PubmanCreator(PubmanBase):
                     continue
                 submitted = self.submit_item(obj_id, mod)
                 logger.info(f"Submitted item: {submitted}")
+        return {
+            "created": created_count,
+            "skipped_existing": skipped_existing,
+            "blocked_existing": blocked_existing,
+            "total": len(request_list),
+        }
