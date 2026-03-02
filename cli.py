@@ -4,7 +4,15 @@ import argparse
 from pathlib import Path
 
 from pubman_manager import USER_DATA_DIR
-from pubman_manager.main import generate_author_overview, generate_doi_overview, upload_publication_pdfs, refresh_pubman_cache
+from pubman_manager.main import (
+    generate_author_overview,
+    generate_doi_overview,
+    upload_publication_pdfs,
+    refresh_pubman_cache,
+    delete_publications_by_dois,
+    load_dois_from_yaml,
+)
+from pubman_manager import PubmanCreator
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -34,6 +42,17 @@ def _build_parser() -> argparse.ArgumentParser:
     cache_group = cache_parser.add_mutually_exclusive_group(required=True)
     cache_group.add_argument("--user-yaml", type=Path, help="Path to user yaml config")
     cache_group.add_argument("--user-id", type=str, help="User id (e.g. 3523285)")
+
+    delete_parser = subparsers.add_parser("delete-dois", help="Delete publications by DOI")
+    delete_group = delete_parser.add_mutually_exclusive_group(required=True)
+    delete_group.add_argument("--doi", action="append", dest="dois")
+    delete_group.add_argument("--doi-yaml", type=Path, dest="doi_yaml", help="YAML list of DOIs or {dois: [...]}")
+    delete_parser.add_argument("--dry-run", action="store_true")
+
+    upload_excel_parser = subparsers.add_parser("upload-excel", help="Upload an Excel sheet to PuRe")
+    upload_excel_parser.add_argument("--file", type=Path, required=True, help="Path to .xlsx file")
+    upload_excel_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries")
+    upload_excel_parser.add_argument("--submit", action="store_true", help="Submit items after upload")
 
     return parser
 
@@ -75,6 +94,26 @@ def main(argv: list[str] | None = None) -> int:
         if args.user_id:
             user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}" / "metadata.yaml"
         refresh_pubman_cache(user_yaml_path)
+        return 0
+    if args.command == "delete-dois":
+        if args.doi_yaml:
+            dois = load_dois_from_yaml(args.doi_yaml)
+        else:
+            dois = args.dois or []
+        summary = delete_publications_by_dois(dois, dry_run=args.dry_run)
+        print(summary)
+        return 0
+    if args.command == "upload-excel":
+        if not args.file.exists():
+            parser.error(f"Excel file not found: {args.file}")
+        if args.file.stat().st_size == 0:
+            parser.error(f"Excel file is empty: {args.file}")
+        pubman_api = PubmanCreator()
+        pubman_api.create_publications(
+            args.file,
+            overwrite=args.overwrite,
+            submit_items=args.submit,
+        )
         return 0
 
     parser.error("Unknown command")
