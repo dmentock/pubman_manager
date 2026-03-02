@@ -274,10 +274,11 @@ class PubmanCreator(PubmanBase):
         pdf_path = Path(pdf_path)
         staging_url = f"{self.base_url}/staging/{pdf_path.name}"
 
-        headers = {"Authorization": self.auth_token}
+        headers = {"Authorization": self.auth_token, "Content-Type": "application/pdf"}
 
         with open(pdf_path, 'rb') as file_data:
-            response = requests.post(staging_url, headers=headers, files={"data": file_data})
+            payload = file_data.read()
+            response = requests.post(staging_url, headers=headers, data=payload)
 
         if response.status_code in [200, 201]:
             return response.json()
@@ -536,10 +537,22 @@ class PubmanCreator(PubmanBase):
             # Pages
             page = self.clean_scalar(row.get('Page'))
             if page:
-                p1, p2 = page.split('-')[0].strip(), page.split('-')[-1].strip()
+                if "-" in page:
+                    p1, p2 = page.split("-", 1)[0].strip(), page.split("-", 1)[1].strip()
+                else:
+                    p1, p2 = page.strip(), ""
+
                 sources[0]['startPage'] = p1
-                sources[0]['endPage'] = p2
-                sources[0]['totalNumberOfPages'] = int(p2) - int(p1) + 1
+                if p2:
+                    sources[0]['endPage'] = p2
+
+                m1 = re.match(r"^\s*([A-Za-z]*)(\d+)\s*$", p1)
+                m2 = re.match(r"^\s*([A-Za-z]*)(\d+)\s*$", p2) if p2 else None
+                if m1 and m2:
+                    prefix1, n1 = m1.group(1).lower(), int(m1.group(2))
+                    prefix2, n2 = m2.group(1).lower(), int(m2.group(2))
+                    if prefix1 == prefix2 and n2 >= n1:
+                        sources[0]['totalNumberOfPages'] = n2 - n1 + 1
 
             # Article number
             article_number = self.clean_scalar(row.get("Article Number"))
