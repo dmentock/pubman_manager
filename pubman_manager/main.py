@@ -14,6 +14,9 @@ from .pubman_creator import PubmanCreator
 from . import PUBLICATIONS_DIR, FILES_DIR, get_user_cache_dir
 from .util import save_yaml, normalize_user_id
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class AuthorName:
@@ -57,7 +60,12 @@ def _load_doi_cache(cache_path: Path) -> dict:
     if not cache_path.exists():
         return {}
     with cache_path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh) or {}
+        data = yaml.safe_load(fh) or {}
+    if isinstance(data, list):
+        return {"legacy": data}
+    if not isinstance(data, dict):
+        return {}
+    return data
 
 def _save_doi_cache(cache_path: Path, data: dict) -> None:
     with cache_path.open("w", encoding="utf-8") as fh:
@@ -99,11 +107,18 @@ def generate_author_overview(
             split=True,
         )
         new_dois = set(dois_crossref + dois_scopus)
-        collected_dois.update(new_dois)
         dois_data = doi_parser.collect_data_for_dois(
             dois_crossref,
             dois_scopus,
         )
+        existing_in_pure = set()
+        if dois_data is not None:
+            for _, row in dois_data.iterrows():
+                doi_value = row.get("DOI")
+                title_value = row.get("Title")
+                if doi_value and doi_parser.has_pubman_entry(str(doi_value), title=title_value):
+                    existing_in_pure.add(str(doi_value))
+        collected_dois.update(new_dois - existing_in_pure)
         if dois_data is not None:
             table_overview = doi_parser.process_dois(dois_data)
             final_overview.extend(table_overview)
@@ -215,3 +230,67 @@ def upload_publication_pdfs(
     if errors:
         raise ValueError("Upload failed:\n" + "\n".join(errors))
     return copied
+
+
+def delete_publications_by_dois(
+    dois: Iterable[str],
+    dry_run: bool = False,
+) -> dict:
+    pubman_api = PubmanCreator()
+    dois_list = [str(doi).strip() for doi in dois if str(doi).strip()]
+    missing = []
+    deleted = 0
+    failed = 0
+    found = 0
+    skipped_ctx = 0
+
+    for doi in dois_list:
+        criteria = {"metadata.identifiers": {"id": doi, "type": "DOI"}}
+        records = pubman_api.search_publication_by_criteria(criteria) or []
+        if not records:
+            missing.append(doi)
+            continue
+        found += len(records)
+        if dry_run:
+            continue
+        for record in records:
+            data = record.get("data", {})
+            ctx_id = (data.get("context") or {}).get("objectId")
+            if ctx_id and ctx_id != pubman_api.ctx_id:
+                skipped_ctx += 1
+                continue
+            item_id = data.get("objectId")
+            last_mod = data.get("lastModificationDate")
+            if not item_id or not last_mod:
+                failed += 1
+                logger.info(f"Missing item metadata for DOI {doi}: {data}")
+                continue
+            if pubman_api.delete_item(item_id, last_mod):
+                deleted += 1
+            else:
+                failed += 1
+
+    summary = {
+        "requested_dois": len(dois_list),
+        "records_found": found,
+        "records_deleted": deleted,
+        "records_failed": failed,
+        "records_skipped_ctx": skipped_ctx,
+        "missing_dois": len(missing),
+        "dry_run": dry_run,
+    }
+    if missing:
+        summary["missing_doi_list"] = missing
+    return summary
+
+
+def load_dois_from_yaml(path: Path) -> list[str]:
+    with path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh)
+    if isinstance(data, dict):
+        data = data.get("dois", [])
+    if data is None:
+        return []
+    if not isinstance(data, list):
+        raise ValueError("YAML must be a list of DOIs or a dict with a 'dois' list.")
+    return [str(item).strip() for item in data if str(item).strip()]

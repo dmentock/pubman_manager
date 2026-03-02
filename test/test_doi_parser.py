@@ -14,7 +14,7 @@ def test_journal_matching():
     # print("crossref_res",crossref_res)
     # df = pd.DataFrame.from_dict(crossref_res)
     # print("df", df)
-    # table_overview = dp.generate_table_from_dois_data(df, force=True)
+    # table_overview = dp.process_dois(df, force=True)
     # print("table_overview",table_overview)
     # return
     res = dp.collect_data_for_dois([doi], [])

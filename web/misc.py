@@ -30,13 +30,16 @@ def update_cache(user_id, org_ids):
     cache_dir = get_user_cache_dir(user_id)
     with open(cache_dir / 'authors_info.yaml', 'r', encoding='utf-8') as f:
         authors_info = yaml.load(f, Loader=yaml.FullLoader)
+    def _omit_affiliation(affiliation: str) -> bool:
+        return "eisenforschung" in str(affiliation).casefold()
     names_affiliations = OrderedDict()
     for key, val in (authors_info or {}).items():
         if not val:
             continue
         counts = val.get("affiliation_counts") if isinstance(val, dict) else None
         if isinstance(counts, dict):
-            names_affiliations[key] = counts
+            filtered = {aff: count for aff, count in counts.items() if not _omit_affiliation(aff)}
+            names_affiliations[key] = filtered
     file_path = TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx"
     n_authors = 80
     column_details = OrderedDict([
@@ -73,6 +76,8 @@ def update_cache(user_id, org_ids):
     for i in range(n_authors):
         if i < len(example_names):
             name, affiliation = example_names[i]
+            if _omit_affiliation(affiliation):
+                affiliation = ""
         else:
             name, affiliation = "", ""
         example_row.extend([name, affiliation])

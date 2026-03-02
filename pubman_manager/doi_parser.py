@@ -110,11 +110,17 @@ class DOIParser:
 
         surname_key = normalize_name_for_comparison(surname)
         first_name_key = normalize_name_for_comparison(first_name)
+        first_name_primary = first_name.split()[0] if first_name else ""
+        first_name_primary_key = normalize_name_for_comparison(first_name_primary)
 
         for pure_first, pure_last in pure_author_names:
             pure_last_key = normalize_name_for_comparison(pure_last)
             pure_first_key = normalize_name_for_comparison(pure_first)
             if surname_key == pure_last_key and first_name_key == pure_first_key:
+                return pure_first, pure_last
+            pure_first_primary = pure_first.split()[0] if pure_first else ""
+            pure_first_primary_key = normalize_name_for_comparison(pure_first_primary)
+            if surname_key == pure_last_key and first_name_primary_key == pure_first_primary_key:
                 return pure_first, pure_last
 
         first_name_without_middles = first_name.split()[0] if first_name else ""
@@ -225,7 +231,8 @@ class DOIParser:
                     canon.append(s)
                     continue
                 match = process.extractOne(s, canon, scorer=fuzz.token_set_ratio)
-                if match and match[1] >= fuzz_threshold and match[0] in allowed:
+                # If the author has no PuRe history, prefer a close match from other authors in the same paper.
+                if match and match[1] >= fuzz_threshold and (match[0] in allowed or not pure_affiliations):
                     res.affiliation = match[0]
                 else:
                     canon.append(s)

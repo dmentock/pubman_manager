@@ -173,8 +173,10 @@ class PubmanBase:
             headers=headers,
             data=json.dumps({"lastModificationDate": last_modification_date})
         )
-        # if response.status_code != 200:
-        #     logger.info(f'deleting item {item_id} failed: {response.text}')
+        if response.status_code in [200, 204]:
+            return True
+        logger.info(f"Deleting item {item_id} failed: {response.status_code} {response.text}")
+        return False
 
     def submit_item(self, item_id, last_modification_date, comment):
         headers = self.headers_json

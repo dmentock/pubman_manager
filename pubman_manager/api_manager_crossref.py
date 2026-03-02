@@ -68,9 +68,15 @@ class CrossrefManager:
         return overview
 
     def extract_authors_affiliations(self, crossref_metadata):
+        def clean_name(value: Any) -> str:
+            if value is None:
+                return ""
+            return " ".join(str(value).split())
+
         affiliations_by_name = OrderedDict()
         for author in crossref_metadata.get('author', []):
-            first_name, last_name = author.get('given', ''), author.get('family', '')
+            first_name = clean_name(author.get('given', ''))
+            last_name = clean_name(author.get('family', ''))
             affiliations_by_name[(first_name, last_name)] = []
             for affiliation in author.get('affiliation', []):
                 affiliations_by_name[(first_name, last_name)].append(unidecode(affiliation.get('name', '')))
