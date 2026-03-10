@@ -54,6 +54,11 @@ def _build_parser() -> argparse.ArgumentParser:
     upload_excel_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries")
     upload_excel_parser.add_argument("--submit", action="store_true", help="Submit items after upload")
 
+    upload_talks_parser = subparsers.add_parser("upload-talks", help="Upload a talks Excel sheet to PuRe")
+    upload_talks_parser.add_argument("--file", type=Path, required=True, help="Path to talks .xlsx file")
+    upload_talks_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries")
+    upload_talks_parser.add_argument("--submit", action="store_true", help="Submit items after upload")
+
     return parser
 
 
@@ -110,6 +115,18 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"Excel file is empty: {args.file}")
         pubman_api = PubmanCreator()
         pubman_api.create_publications(
+            args.file,
+            overwrite=args.overwrite,
+            submit_items=args.submit,
+        )
+        return 0
+    if args.command == "upload-talks":
+        if not args.file.exists():
+            parser.error(f"Excel file not found: {args.file}")
+        if args.file.stat().st_size == 0:
+            parser.error(f"Excel file is empty: {args.file}")
+        pubman_api = PubmanCreator()
+        pubman_api.create_talks(
             args.file,
             overwrite=args.overwrite,
             submit_items=args.submit,

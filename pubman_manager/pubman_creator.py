@@ -561,10 +561,12 @@ class PubmanCreator(PubmanBase):
 
             # PDF
             files = []
+            local_tags = []
             pdf_path = Path(FILES_DIR / f'{doi.replace("/", "")}.pdf')
 
             license_url = row.get('License url')
             if license_url:
+                local_tags = ["OpenAccess_MPIE", "OpenAccess_MA"]
                 if not pdf_path.exists():
                     logger.error(f'PDF for DOI {doi} not found: {pdf_path}')
                     missing_pdfs.append(pdf_path.name)
@@ -609,7 +611,7 @@ class PubmanCreator(PubmanBase):
                             "creationDate": "", "creator": {"objectId": self.user_id}},
                 "creator": {"objectId": self.user_id},
                 "modifier": {"objectId": self.user_id},
-                "localTags": [],
+                "localTags": local_tags,
                 "metadata": {
                     "title": title,
                     "creators": metadata_creators,
