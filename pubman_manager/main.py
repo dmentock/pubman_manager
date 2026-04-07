@@ -13,6 +13,11 @@ from .pubman_extractor import PubmanExtractor
 from .doi_parser import DOIParser
 from .pubman_creator import PubmanCreator
 from . import PUBLICATIONS_DIR, FILES_DIR, get_user_cache_dir
+from .talk_template import (
+    TALK_TEMPLATE_COLUMN_DETAILS,
+    TALK_TEMPLATE_DISCLAIMER_TEXT,
+    TALK_TEMPLATE_EXAMPLE_FIXED,
+)
 from .util import save_yaml, normalize_user_id
 
 import logging
@@ -229,28 +234,8 @@ def generate_talks_template(
     file_path = output_path or (TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx")
     file_path.parent.mkdir(parents=True, exist_ok=True)
     n_authors = 80
-    column_details = OrderedDict([
-        ('Event Name', [35, '']),
-        ('Conference start date\n(dd.mm.YYYY)', [20, '']),
-        ('Conference end date\n(dd.mm.YYYY)', [20, '']),
-        ('Talk date\n(dd.mm.YYYY)', [20, '']),
-        ('Conference Location\n(City, Country)', [15, 'In case of an US-city, please add the State name as well (e.g. New London, NH, USA)']),
-        ('Invited (yes/no)', [15, 'Select yes or no']),
-        ('Type (Talk/Poster)', [15, '']),
-        ('Talk Title', [50, '']),
-        ('Comment (Optional)', [25, '']),
-    ])
-    example_fixed = [
-        "deRSE23 - Conference for Research Software Engineering in Germany",
-        "20.03.2023",
-        "22.03.2023",
-        "21.03.2023",
-        "Paderborn, Germany",
-        "no",
-        "",
-        "DAMASK: Challenges in collaborative development and outlook",
-        "",
-    ]
+    column_details = TALK_TEMPLATE_COLUMN_DETAILS.copy()
+    example_fixed = list(TALK_TEMPLATE_EXAMPLE_FIXED)
     example_names = [
         ("Daniel Otto de Mentock", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
         ("Sharan Roongta", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
@@ -277,6 +262,7 @@ def generate_talks_template(
         n_entries=45,
         example_row=example_row,
         freeze_first_n_cols=0,
+        disclaimer_text=TALK_TEMPLATE_DISCLAIMER_TEXT,
     )
     return file_path
 

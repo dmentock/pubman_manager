@@ -38,6 +38,7 @@ def create_sheet(
     n_entries: Optional[int] = None,
     example_row: Optional[List[str]] = None,
     freeze_first_n_cols: int = 1,
+    disclaimer_text: Optional[List[str]] = None,
 ):
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided.")
@@ -111,17 +112,18 @@ def create_sheet(
     for col_index, (header, (width, _tooltip)) in enumerate(alternating_columns.items()):
         sheet_main.set_column(col_index, col_index, width)
 
-    disclaimer_text = [
-        "Please fill out Talk/Poster details in the same format as the example entry.",
-        "Select author names and affiliations from dropdowns where possible.",
-        "If an author is missing from the dropdown list and can't be found with ctrl+f in the 'Names' sheet, write the name manuually in the cell",
-        "If an affiliation is missing from the dropdown list, write it manually in the cell.",
-        "Affiliations need to follow an exact pattern (<department>, <institution>, <address>) for external or ",
-        "(<group_name>, <department>, <institute>) for MPI authors.",
-        "If an author has multiple affiliations, add the same author multiple times with different affiliations.",
-        "",
-        "Please see the example affiliations or the 'MPI_Affiliations' sheet for further reference."
-    ]
+    if disclaimer_text is None:
+        disclaimer_text = [
+            "Please fill out Talk/Poster details in the same format as the example entry.",
+            "Select author names and affiliations from dropdowns where possible.",
+            "If an author is missing from the dropdown list and can't be found with ctrl+f in the 'Names' sheet, write the name manuually in the cell",
+            "If an affiliation is missing from the dropdown list, write it manually in the cell.",
+            "Affiliations need to follow an exact pattern (<department>, <institution>, <address>) for external or ",
+            "(<group_name>, <department>, <institute>) for MPI authors.",
+            "If an author has multiple affiliations, add the same author multiple times with different affiliations.",
+            "",
+            "Please see the example affiliations or the 'MPI_Affiliations' sheet for further reference.",
+        ]
 
     hidden_rows_count = len(full_names)
     row_disclaimer_start = hidden_rows_count + 1

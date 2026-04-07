@@ -32,9 +32,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture
-def test_resources_dir():
+def mock_calls_dir():
     """Return the base test/resources directory."""
-    return PROJECT_ROOT / "test" / "resources"
+    return PROJECT_ROOT / "test" / ".mock_calls"
 
 
 @pytest.fixture
@@ -212,7 +212,7 @@ def _make_response(entry: dict[str, Any]) -> requests.Response:
 # Main fixture: record / replay
 # ----------------------------
 @pytest.fixture
-def external_http_cache(monkeypatch, request, test_resources_dir):
+def external_http_cache(monkeypatch, request, mock_calls_dir):
     """
     Record / replay external HTTP calls (Crossref, Scopus, Pubman).
 
@@ -233,7 +233,7 @@ def external_http_cache(monkeypatch, request, test_resources_dir):
     safe_file = _SAFE_NAME.sub("_", Path(path).stem)
     safe_test = _SAFE_NAME.sub("_", request.node.name)
 
-    base_dir = test_resources_dir / "doi_cache" / safe_file / safe_test
+    base_dir = mock_calls_dir / "doi_cache" / safe_file / safe_test
     base_dir.mkdir(parents=True, exist_ok=True)
 
     service_files = {

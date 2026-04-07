@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 
 from pubman_manager import PubmanBase, FILES_DIR
 from pubman_manager import get_user_cache_dir
+from pubman_manager.talk_template import TALK_EXTERNAL_LINK_HEADER
 from pubman_manager.util import is_mpi_affiliation, load_yaml
 
 
@@ -407,6 +408,25 @@ class PubmanCreator(PubmanBase):
             else:
                 raise RuntimeError(f'Invalid Type (Talk/Poster): "{row.get("Type (Talk/Poster)")}"')
 
+            files = []
+            external_link = str(row.get(TALK_EXTERNAL_LINK_HEADER) or '').strip()
+            if external_link:
+                files.append({
+                    "objectId": "",
+                    "lastModificationDate": "",
+                    "creationDate": "",
+                    "creator": {"objectId": ""},
+                    "visibility": "PUBLIC",
+                    "content": external_link,
+                    "storage": "EXTERNAL_URL",
+                    "size": 0,
+                    "metadata": {
+                        "title": external_link,
+                        "contentCategory": "publisher-version",
+                        "size": 0,
+                    },
+                })
+
             request = {
                 "context": {"objectId": self.ctx_id, "name": "", "lastModificationDate": "",
                             "creationDate": "", "creator": {"objectId": ""}},
@@ -431,7 +451,7 @@ class PubmanCreator(PubmanBase):
                     },
                     "languages": ["eng"],
                 },
-                "files": [],
+                "files": files,
             }
 
             request_list.append((
