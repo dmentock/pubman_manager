@@ -43,24 +43,23 @@ def update_cache(user_id, org_ids):
     file_path = TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx"
     n_authors = 80
     column_details = OrderedDict([
-        ('', [12, '']),
         ('Event Name', [35, '']),
         ('Conference start date\n(dd.mm.YYYY)', [20, '']),
         ('Conference end date\n(dd.mm.YYYY)', [20, '']),
         ('Talk date\n(dd.mm.YYYY)', [20, '']),
         ('Conference Location\n(City, Country)', [15, 'In case of an US-city, please add the State name as well (e.g. New London, NH, USA)']),
-        ('Invited (y/n)', [15, '']),
+        ('Invited (yes/no)', [15, 'Select yes or no']),
         ('Type (Talk/Poster)', [15, '']),
         ('Talk Title', [50, '']),
         ('Comment (Optional)', [25, '']),
     ])
     example_fixed = [
-        "Example: deRSE23 - Conference for Research Software Engineering in Germany",
+        "deRSE23 - Conference for Research Software Engineering in Germany",
         "20.03.2023",
         "22.03.2023",
         "21.03.2023",
         "Paderborn, Germany",
-        "n",
+        "no",
         "",
         "DAMASK: Challenges in collaborative development and outlook",
         "",
@@ -89,6 +88,7 @@ def update_cache(user_id, org_ids):
         "Event Name",
         n_entries=45,
         example_row=example_row,
+        freeze_first_n_cols=0,
     )
 
 def get_file_for_dois(dois, doi_parser):

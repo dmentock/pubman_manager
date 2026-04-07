@@ -266,6 +266,18 @@ class PubmanCreator(PubmanBase):
         except:
             return str(scalar)
 
+    def is_invited_talk(self, row: dict[str, Any]) -> bool:
+        raw_value = row.get('Invited (yes/no)', row.get('Invited (y/n)', ''))
+        normalized = str(raw_value).strip().lower()
+        return normalized in {'y', 'yes', 'true', '1'}
+
+    @staticmethod
+    def is_example_talk_row(row: dict[str, Any]) -> bool:
+        return (
+            str(row.get("Event Name", "")).strip() == "deRSE23 - Conference for Research Software Engineering in Germany"
+            and str(row.get("Talk Title", "")).strip() == "DAMASK: Challenges in collaborative development and outlook"
+        )
+
     # -------------------------------------------------------------------------
     #  PDF UPLOAD
     # -------------------------------------------------------------------------
@@ -349,16 +361,7 @@ class PubmanCreator(PubmanBase):
 
     def create_talks(self, file_path, create_items=True, submit_items=False, overwrite=False):
         rows = self.extract_prefilled_rows(file_path, header_name="Event Name")
-        example_index = None
-        for idx, row in enumerate(rows):
-            for value in row.values():
-                if isinstance(value, str) and value.strip().casefold() == "example":
-                    example_index = idx
-                    break
-            if example_index is not None:
-                break
-        if example_index is not None:
-            rows = rows[example_index + 1 :]
+        rows = [row for row in rows if not self.is_example_talk_row(row)]
         request_list = []
         missing_pdfs = []
 
@@ -424,7 +427,7 @@ class PubmanCreator(PubmanBase):
                         "place": row.get('Conference Location\n(City, Country)'),
                         "startDate": self.safe_date_parse(row.get('Conference start date\n(dd.mm.YYYY)')).strftime("%Y-%m-%d"),
                         "title": row.get('Event Name'),
-                        "invitationStatus": "INVITED" if row.get('Invited (y/n)', "").strip().lower() == 'y' else None
+                        "invitationStatus": "INVITED" if self.is_invited_talk(row) else None
                     },
                     "languages": ["eng"],
                 },
@@ -566,7 +569,22 @@ class PubmanCreator(PubmanBase):
 
             license_url = row.get('License url')
             if license_url:
-                local_tags = ["OpenAccess_MPIE", "OpenAccess_MA"]
+                # Always add MPIE OA tag, then pick a second tag from the first MPI author.
+                second_local_tag = "OpenAccess_MA"
+                for _, info in row_authors_info.items():
+                    affiliations = info.get("affiliations", [])
+                    mpi_affiliations = [aff for aff in affiliations if is_mpi_affiliation(aff)]
+                    if not mpi_affiliations:
+                        continue
+
+                    normalized_affiliations = " | ".join(mpi_affiliations).lower()
+                    if "structure and nano-/ micromechanics of materials" in normalized_affiliations:
+                        second_local_tag = "OpenAccess_SN"
+                    elif "computational materials design" in normalized_affiliations:
+                        second_local_tag = "OpenAccess_CM"
+                    break
+
+                local_tags = ["OpenAccess_MPIE", second_local_tag]
                 if not pdf_path.exists():
                     logger.error(f'PDF for DOI {doi} not found: {pdf_path}')
                     missing_pdfs.append(pdf_path.name)
@@ -581,7 +599,6 @@ class PubmanCreator(PubmanBase):
                         "pid": "",
                         'content': file_id,
                         "visibility": "PUBLIC",
-                        "contentCategory": "publisher-version",
                         "checksum": "",
                         "checksumAlgorithm": "MD5",
                         "mimeType": "",
@@ -590,6 +607,7 @@ class PubmanCreator(PubmanBase):
                         "metadata": {
                             "title": pdf_path.name,
                             "description": "File downloaded from scopus",
+                            "contentCategory": "publisher-version",
                             "formats": [{"value": "", "type": ""}],
                             "size": 0,
                             "license": license_url,

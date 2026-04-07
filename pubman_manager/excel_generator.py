@@ -37,6 +37,7 @@ def create_sheet(
     prefill_publications: Optional[List[Dict[str, Cell]]] = None,
     n_entries: Optional[int] = None,
     example_row: Optional[List[str]] = None,
+    freeze_first_n_cols: int = 1,
 ):
     if prefill_publications is None and n_entries is None:
         raise ValueError("Either prefill_publications or n_entries must be provided.")
@@ -111,8 +112,15 @@ def create_sheet(
         sheet_main.set_column(col_index, col_index, width)
 
     disclaimer_text = [
-        "Please try to avoid copy-pasting in areas with dropdowns, as this will break the underlying data validation and make subsequent editing difficult.",
-        "Only do so if you are sure you won't have to change the author name or affiliations afterwards, e.g. when pasting from identical sections from previous entries."
+        "Please fill out Talk/Poster details in the same format as the example entry.",
+        "Select author names and affiliations from dropdowns where possible.",
+        "If an author is missing from the dropdown list and can't be found with ctrl+f in the 'Names' sheet, write the name manuually in the cell",
+        "If an affiliation is missing from the dropdown list, write it manually in the cell.",
+        "Affiliations need to follow an exact pattern (<department>, <institution>, <address>) for external or ",
+        "(<group_name>, <department>, <institute>) for MPI authors.",
+        "If an author has multiple affiliations, add the same author multiple times with different affiliations.",
+        "",
+        "Please see the example affiliations or the 'MPI_Affiliations' sheet for further reference."
     ]
 
     hidden_rows_count = len(full_names)
@@ -124,7 +132,7 @@ def create_sheet(
     data_rows_including_example = n_entries + (1 if example_row else 0)
     row_data_end = row_data_start + data_rows_including_example - 1
 
-    sheet_main.freeze_panes(row_data_start, 1)
+    sheet_main.freeze_panes(row_data_start, freeze_first_n_cols)
 
     last_col_letter = col_num_to_col_letter(len(headers))
     for i, line in enumerate(disclaimer_text):
@@ -190,12 +198,20 @@ def create_sheet(
             is_example_cell = is_example_row and (header in example_values_by_header)
             if (not header.startswith('Helper ')) and (not is_example_cell):
                 sheet_main.write(row, col, '', fmt_wrap)
-            if tooltip:
+            if tooltip and header != 'Invited (yes/no)':
                 sheet_main.data_validation(row, col, row, col, {
                     'validate': 'any',
                     'input_message': tooltip,
                     'error_type': 'warning'
                 })
+        if 'Invited (yes/no)' in header_to_index:
+            invited_col = header_to_index['Invited (yes/no)']
+            sheet_main.data_validation(row, invited_col, row, invited_col, {
+                'validate': 'list',
+                'source': ['yes', 'no'],
+                'input_message': 'Select yes or no',
+                'error_type': 'warning'
+            })
         for k in range(1, n_authors + 1):
             add_author_affiliation_validation(row, k)
 

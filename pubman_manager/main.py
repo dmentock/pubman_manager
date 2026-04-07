@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -190,8 +191,94 @@ def refresh_pubman_cache(user_yaml_path: Path) -> Path:
     if not isinstance(user_data, dict):
         raise ValueError("User yaml must be a dict with department_org_ids.")
     org_ids = user_data.get("department_org_ids", [])
-    user_id = normalize_user_id(user_yaml_path.stem.replace("user_", "", 1))
+    user_id = normalize_user_id(user_yaml_path.parent.name.replace("user_", "", 1))
     return refresh_pubman_cache_for_user(user_id, org_ids)
+
+
+def generate_talks_template(
+    user_id: str,
+    org_ids: Iterable[str],
+    output_path: Optional[Path] = None,
+) -> Path:
+    from . import TALKS_DIR, get_user_cache_dir
+    from .excel_generator import create_sheet
+
+    user_id = normalize_user_id(user_id)
+    org_ids = list(dict.fromkeys(org_ids))
+    if not org_ids:
+        raise ValueError("department_org_ids missing.")
+
+    refresh_pubman_cache_for_user(user_id, org_ids)
+
+    cache_dir = get_user_cache_dir(user_id)
+    with open(cache_dir / 'authors_info.yaml', 'r', encoding='utf-8') as f:
+        authors_info = yaml.load(f, Loader=yaml.FullLoader)
+
+    def _omit_affiliation(affiliation: str) -> bool:
+        return "eisenforschung" in str(affiliation).casefold()
+
+    names_affiliations = OrderedDict()
+    for key, val in (authors_info or {}).items():
+        if not val:
+            continue
+        counts = val.get("affiliation_counts") if isinstance(val, dict) else None
+        if isinstance(counts, dict):
+            filtered = {aff: count for aff, count in counts.items() if not _omit_affiliation(aff)}
+            names_affiliations[key] = filtered
+
+    file_path = output_path or (TALKS_DIR / f"Template_Talks_{org_ids[0]}.xlsx")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    n_authors = 80
+    column_details = OrderedDict([
+        ('Event Name', [35, '']),
+        ('Conference start date\n(dd.mm.YYYY)', [20, '']),
+        ('Conference end date\n(dd.mm.YYYY)', [20, '']),
+        ('Talk date\n(dd.mm.YYYY)', [20, '']),
+        ('Conference Location\n(City, Country)', [15, 'In case of an US-city, please add the State name as well (e.g. New London, NH, USA)']),
+        ('Invited (yes/no)', [15, 'Select yes or no']),
+        ('Type (Talk/Poster)', [15, '']),
+        ('Talk Title', [50, '']),
+        ('Comment (Optional)', [25, '']),
+    ])
+    example_fixed = [
+        "deRSE23 - Conference for Research Software Engineering in Germany",
+        "20.03.2023",
+        "22.03.2023",
+        "21.03.2023",
+        "Paderborn, Germany",
+        "no",
+        "",
+        "DAMASK: Challenges in collaborative development and outlook",
+        "",
+    ]
+    example_names = [
+        ("Daniel Otto de Mentock", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+        ("Sharan Roongta", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+        ("Philip Eisenlohr", "Michigan State University, Chemical Engineering and Materials Science, East Lansing, MI 48824, USA"),
+        ("Martin Diehl", "Department of Computer Science, KU Leuven, Celestijnenlaan 200 A, Leuven 3001, Belgium"),
+        ("Franz Roters", "Theory and Simulation, Microstructure Physics and Alloy Design, Max-Planck-Institut für Eisenforschung GmbH, Max Planck Society"),
+    ]
+    example_row = list(example_fixed)
+    for i in range(n_authors):
+        if i < len(example_names):
+            name, affiliation = example_names[i]
+            if _omit_affiliation(affiliation):
+                affiliation = ""
+        else:
+            name, affiliation = "", ""
+        example_row.extend([name, affiliation])
+
+    create_sheet(
+        file_path,
+        names_affiliations,
+        column_details,
+        n_authors,
+        "Event Name",
+        n_entries=45,
+        example_row=example_row,
+        freeze_first_n_cols=0,
+    )
+    return file_path
 
 
 def upload_publication_pdfs(

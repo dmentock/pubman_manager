@@ -3,10 +3,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from pubman_manager import USER_DATA_DIR
+from pubman_manager import USER_DATA_DIR, load_user_config
 from pubman_manager.main import (
     generate_author_overview,
     generate_doi_overview,
+    generate_talks_template,
     upload_publication_pdfs,
     refresh_pubman_cache,
     delete_publications_by_dois,
@@ -53,6 +54,26 @@ def _build_parser() -> argparse.ArgumentParser:
     upload_excel_parser.add_argument("--file", type=Path, required=True, help="Path to .xlsx file")
     upload_excel_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing entries")
     upload_excel_parser.add_argument("--submit", action="store_true", help="Submit items after upload")
+
+    generate_template_parser = subparsers.add_parser(
+        "generate-talks-template",
+        help="Generate a talks template .xlsx file for a user/org",
+    )
+    template_user_group = generate_template_parser.add_mutually_exclusive_group(required=True)
+    template_user_group.add_argument("--user-yaml", type=Path, help="Path to user yaml config")
+    template_user_group.add_argument("--user-id", type=str, help="User id (e.g. 3523285)")
+    generate_template_parser.add_argument(
+        "--org-id",
+        action="append",
+        dest="org_ids",
+        help="Department org id (e.g. ou_1863336)",
+    )
+    generate_template_parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Path for the generated talks template .xlsx file",
+    )
 
     upload_talks_parser = subparsers.add_parser("upload-talks", help="Upload a talks Excel sheet to PuRe")
     upload_talks_parser.add_argument("--file", type=Path, required=True, help="Path to talks .xlsx file")
@@ -119,6 +140,29 @@ def main(argv: list[str] | None = None) -> int:
             overwrite=args.overwrite,
             submit_items=args.submit,
         )
+        return 0
+    if args.command == "generate-talks-template":
+        user_yaml_path = args.user_yaml
+        if args.user_id:
+            user_yaml_path = USER_DATA_DIR / f"user_{args.user_id}" / "metadata.yaml"
+        if not user_yaml_path.exists():
+            parser.error(f"User yaml not found: {user_yaml_path}")
+        org_ids = args.org_ids or []
+        if not org_ids:
+            user_data = load_user_config(user_yaml_path)
+            if isinstance(user_data, dict):
+                org_ids = user_data.get("department_org_ids", [])
+        if not org_ids:
+            parser.error(
+                "No department org ids configured. Provide --org-id or set department_org_ids in user yaml."
+            )
+        user_id = args.user_id or user_yaml_path.parent.name.replace("user_", "", 1)
+        output_path = generate_talks_template(
+            user_id,
+            org_ids,
+            output_path=args.output,
+        )
+        print(output_path)
         return 0
     if args.command == "upload-talks":
         if not args.file.exists():
