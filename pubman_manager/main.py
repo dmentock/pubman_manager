@@ -8,6 +8,7 @@ from typing import Iterable, Optional, Tuple
 
 import re
 import yaml
+import pandas as pd
 
 from .pubman_extractor import PubmanExtractor
 from .doi_parser import DOIParser
@@ -122,7 +123,7 @@ def generate_author_overview(
             for _, row in dois_data.iterrows():
                 doi_value = row.get("DOI")
                 title_value = row.get("Title")
-                if doi_value and doi_parser.has_pubman_entry(str(doi_value), title=title_value):
+                if doi_value and title_value and not pd.isna(title_value) and doi_parser.has_pubman_entry(str(doi_value), title=title_value):
                     existing_in_pure.add(str(doi_value))
         collected_dois.update(new_dois - existing_in_pure)
         if dois_data is not None:
