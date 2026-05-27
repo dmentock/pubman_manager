@@ -383,10 +383,7 @@ class DOIParser:
 
             def clean_html(raw_html):
                 soup = BeautifulSoup(raw_html, "html.parser")
-                # Preserve HTML tags while removing unnecessary whitespace
-                # Convert back to string to keep tags intact
                 cleaned = str(soup).strip()
-                # Remove extra whitespace and newlines while preserving tag structure
                 cleaned = ' '.join(cleaned.split())
                 return cleaned
 

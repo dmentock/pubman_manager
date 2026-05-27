@@ -641,6 +641,7 @@ class PubmanCreator(PubmanBase):
                             pass
                     if 'arxiv' in license_url.lower():
                         file_entry["metadata"]["contentCategory"] = "pre-print"
+                    file_entry["metadata"]["rights"] = "The Authors"
                     files.append(file_entry)
 
             # Build final request
